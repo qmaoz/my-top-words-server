@@ -1,10 +1,12 @@
 const { validationResult } = require('express-validator'); 
-const { User } = require('../models/models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+
+const { User } = require('../models/models');
 const { consoleError } = require('../utils');
 
-const dotenv = require('dotenv');
+
 dotenv.config({ quiet: true });
 
 async function register(req, res) {
@@ -20,8 +22,6 @@ async function register(req, res) {
     }
     
     const { username, password } = req.body;
-
-    // Generate a unique salt and hash the password to prevent plain-text storage
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
@@ -30,13 +30,12 @@ async function register(req, res) {
       password: passwordHash
     });
 
-    // Generate a JWT to keep the user logged in immediately after registration
+    // generate a JWT to keep the user logged in immediately after registration
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET_KEY, {
       expiresIn: '24h'
     });
 
-    // Exclude sensitive password hashes from the final API response
-    const {...userData } = user['dataValues'];
+    const { ...userData } = user['dataValues'];
     delete userData.password;
 
     return res.status(201).json({
@@ -56,8 +55,6 @@ async function register(req, res) {
 async function login(req, res) {
   try {
     const { username, password } = req.body;
-    
-    // Lookup user by username to verify existence
     const user = await User.findOne({ where: { username } });
     if (!user) {
       return res.status(400).json({
@@ -66,7 +63,6 @@ async function login(req, res) {
       });
     }
 
-    // Compare the plain-text password with the salted hash from the DB
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(400).json({
@@ -79,9 +75,9 @@ async function login(req, res) {
       expiresIn: '24h'
     });
 
-    // remove password field from the response object
     const {...userData } = user['dataValues'];
     delete userData.password;
+
     res.json({ userData, token });
   } catch (error) {
     consoleError('Помилка під час авторизації: ', error.message);

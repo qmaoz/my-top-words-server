@@ -7,9 +7,7 @@
   "scripts": {
     "start:dev": "nodemon index.js",
     "start": "node index.js",
-    "lint": "eslint .",
-    "test": "jest",
-    "test:doc": "npx jest --verbose > docs/API_TEST_DOCS.md"
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -31,9 +29,5 @@
     "nodemon": "^3.1.11",
     "pg": "^8.16.3",
     "sequelize": "^6.37.7"
-  },
-  "devDependencies": {
-    "jest": "^30.3.0",
-    "supertest": "^7.2.2"
   }
 }

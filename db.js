@@ -7,6 +7,7 @@ var sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.
   host: process.env.DB_HOST,
   dialect: process.env.DB_DIALECT,
   logging: false,
+  // logging: console.log
 });
 
 module.exports = sequelize;

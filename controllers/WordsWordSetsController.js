@@ -1,7 +1,7 @@
 const { Sequelize } = require('sequelize');
 
-const { UsersWordSets, WordSet } = require('../models/models');
 const { consoleError } = require('../utils');
+const { UsersWordSets, WordSet, WordsWordSets, Word } = require('../models/models');
 
 async function updateWordSetWords(req, res) {
   try {
@@ -10,7 +10,6 @@ async function updateWordSetWords(req, res) {
     const userId = req.userId;
 
     const wordSet = await WordSet.findByPk(wordSetId);
-
     if (!wordSet) {
       return res.status(404).json({
         source: 'Помилка під час оновлення вмісту набору',
@@ -40,27 +39,74 @@ async function updateWordSetWords(req, res) {
   }
 }
 
-async function removeFromSet(req, res) {
+async function toggleIncludeWordInWordSet(req, res) {
   try {
-    const { wordSetId, wordId } = req.params;
+    const { wordId, wordSetId } = req.params;
     
     const wordSet = await WordSet.findByPk(wordSetId);
     if (!wordSet) {
       return res.status(404).json({
-        source: 'Помилка під час видалення слів з набору',
+        source: 'Помилка під час видалення слів з набору або додавання слів в набір ',
         message: `Набір #${wordSetId} не знайдено`
       });
     }
+    const word = await Word.findByPk(wordId);
+    if (!word) {
+      return res.status(404).json({
+        source: 'Помилка під час видалення слів з набору або додавання слів в набір ',
+        message: `Слово #${wordId} не знайдено`
+      });
+    }
+
+    const existingRecord = await WordsWordSets.findOne({
+      where: {
+        word_id: wordId,
+        word_set_id: wordSetId
+      }
+    });
+
+    const actionName = existingRecord ? 'remove' : 'include';
     
-    await wordSet.removeWordSetWords(wordId);
-    res.json({ message: 'Слово успішно видалено з набору' });
+
+    if (actionName === 'include') {
+      await WordsWordSets.create({
+        word_id: wordId,
+        word_set_id: wordSetId
+      });
+      // console.log('include');
+      
+    } else if (actionName === 'remove') {
+      // console.log('remove');
+      await existingRecord.destroy();
+    }
+
+    // console.log('actionName: ', actionName);
+    // console.log('word.dataValues: ', word.dataValues);
+
+    // const test = {
+    //   success: true,
+    //   actionName,
+    //   word: actionName == 'include' ? word.dataValues : undefined,
+    //   message: `Слово успішно ${actionName == 'remove' ? 'видалено з набору' : 'додано в набір'}`
+    // };
+
+    // console.log('test: ', test);
+    
+    
+    // await wordSet.removeWordSetWords(wordId);
+    res.json({
+      success: true,
+      actionName,
+      word: actionName == 'include' ? word.dataValues : undefined,
+      message: `Слово успішно ${actionName == 'remove' ? 'видалено з набору' : 'додано в набір'}`
+    });
   } catch (error) {
-    consoleError('Помилка під час видалення слів з набору: ' + error.message);
+    consoleError('Помилка під час видалення слів з набору або додавання слів в набір: ' + error.message);
     res.status(500).json({
-      source: 'Помилка під час видалення слів з набору',
+      source: 'Помилка під час видалення слів з набору або додавання слів в набір',
       message: error.message
     });
   }
 }
 
-module.exports = { updateWordSetWords, removeFromSet };
+module.exports = { updateWordSetWords, toggleIncludeWordInWordSet };

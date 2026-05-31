@@ -1,27 +1,10 @@
-const dotenv = require('dotenv');
-const sequelize = require('../db');
 const { DataTypes } = require('sequelize');
+const dotenv = require('dotenv');
+
+const sequelize = require('../db');
+
 
 dotenv.config({ quiet: true });
-
-const LearningStatus = sequelize.define('learning_statuses',
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
-    },
-    name: {
-      type: DataTypes.STRING,
-      unique: true,
-      allowNull: false
-    },
-  },
-  {
-    timestamps: false,
-    tableName: 'learning_statuses'
-  },
-);
 
 const User = sequelize.define('users',
   {
@@ -104,23 +87,6 @@ const WordSet = sequelize.define('word-sets',
   },
 );
 
-const UsersWords = sequelize.define('users__words',
-  {
-    last_repeat_date: {
-      type: DataTypes.DATEONLY
-    },
-    is_saved_for_learning: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    },
-  },
-  {
-    timestamps: false,
-    tableName: 'users__words'
-  },
-);
-
 const WordsWordSets = sequelize.define('words__word_sets',
   {
     word_id: {
@@ -139,11 +105,6 @@ const WordsWordSets = sequelize.define('words__word_sets',
         key: 'id'
       }
     },
-    is_included: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    }
   },
   {
     timestamps: false,
@@ -152,13 +113,7 @@ const WordsWordSets = sequelize.define('words__word_sets',
 );
 
 const UsersWordSets = sequelize.define('users__word_sets',
-  {
-    is_saved_for_learning: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    }
-  },
+  {},
   {
     timestamps: false,
     tableName: 'users__word_sets'
@@ -173,22 +128,6 @@ User.hasMany(Word, {
 Word.belongsTo(User, {
   foreignKey: 'owner_user_id',
   as: 'wordOwnerInfo',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
-});
-
-
-User.belongsToMany(Word, {
-  through: UsersWords,
-  foreignKey: 'user_id',
-  as: 'users',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
-});
-Word.belongsToMany(User, {
-  through: UsersWords,
-  foreignKey: 'word_id',
-  as: 'users',
   onDelete: 'CASCADE',
   onUpdate: 'CASCADE'
 });
@@ -221,7 +160,8 @@ WordSet.belongsToMany(User, {
 Word.belongsToMany(WordSet, {
   through: WordsWordSets,
   foreignKey: 'word_id',
-  as: 'wordSets',
+  // as: 'wordSets', // HERE: this was a previous version
+  as: 'wordWordSets',
   onDelete: 'CASCADE',
   onUpdate: 'CASCADE'
 });
@@ -231,32 +171,6 @@ WordSet.belongsToMany(Word, {
   as: 'wordSetWords',
   onDelete: 'CASCADE',
   onUpdate: 'CASCADE'
-});
-
-UsersWords.belongsTo(LearningStatus, {
-  foreignKey: 'word_learning_status_id',
-  as: 'wordLearningStatus',
-  onDelete: 'SET NULL',
-  onUpdate: 'CASCADE'
-});
-
-UsersWords.belongsTo(Word, {
-  foreignKey: 'word_id',
-  as: 'wordProgress',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
-});
-
-Word.hasMany(UsersWords, {
-  foreignKey: 'word_id',
-  as: 'wordProgress',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
-});
-
-LearningStatus.hasMany(UsersWords, {
-  foreignKey: 'word_learning_status_id',
-  as: 'wordStatuses'
 });
 
 
@@ -278,5 +192,5 @@ WordSet.prototype.toJSON = function () {
 
 
 module.exports = {
-  LearningStatus, User, Word, WordSet, UsersWords, WordsWordSets, UsersWordSets
+  User, Word, WordSet, WordsWordSets, UsersWordSets
 };

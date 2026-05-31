@@ -1,15 +1,15 @@
 const line = '############################################################################################';
 
 function consoleLog(...message) {
-  console.log('\n' + line);
+  console.log();
   console.log(...message);
-  console.log(line + '\n');
+  console.log('\n' + line);
 }
 
 function consoleError(...message) {
-  console.log('\n' + line);
+  console.log();
   console.error(...message);
-  console.log(line + '\n');
+  console.log('\n' + line);
 }
 
 module.exports = { consoleLog, consoleError };

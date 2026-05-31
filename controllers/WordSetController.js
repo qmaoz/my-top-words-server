@@ -1,19 +1,12 @@
 const { Sequelize } = require('sequelize');
 const { validationResult } = require('express-validator');
 
-const { WordSet, User, Word } = require('../models/models');
+const { WordSet, User, Word, WordsWordSets } = require('../models/models');
 const { consoleError } = require('../utils');
 
-const literalPopularity = '(SELECT COUNT(*) FROM users__word_sets AS uws WHERE uws.word_set_id = "word-sets".id AND uws.is_saved_for_learning = true)';
+const literalPopularity = '(SELECT COUNT(*) FROM users__word_sets AS uws WHERE uws.word_set_id = "word-sets".id)';
 const literalTotalWords = '(SELECT COUNT(*) FROM words__word_sets AS wws WHERE wws.word_set_id = "word-sets".id)';
-const literalLearned = `(
-  SELECT COUNT(*) FROM words__word_sets AS wws
-  INNER JOIN users__words AS uw ON wws.word_id = uw.word_id
-  WHERE wws.word_set_id = "word-sets".id AND uw.user_id = :learnerId AND uw.word_learning_status_id = 6
-)`;
-const literalIsSaved = `EXISTS (
-  SELECT 1 FROM users__word_sets WHERE word_set_id = "word-sets".id AND user_id = :learnerId AND is_saved_for_learning = true
-)`;
+const literalIsSaved = 'EXISTS (SELECT 1 FROM users__word_sets WHERE word_set_id = "word-sets".id AND user_id = :learnerId)';
 
 async function getAll(req, res) {
   try {
@@ -21,7 +14,10 @@ async function getAll(req, res) {
     const isAuth = learnerId != null;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
-    const { filter } = req.query; // filter: 'saved' / 'own'
+    const { filter, partOfName } = req.query; // possible filters: 'top' / 'saved' / 'own'
+    // console.log('partOfName: ', partOfName);
+    // console.log('filter: ', filter);
+    // console.log('learnerId: ', learnerId);
 
     if (!isAuth && (filter == 'own' || filter == 'saved')) {
       throw new Error('Помилка авторизації');
@@ -31,6 +27,22 @@ async function getAll(req, res) {
 
     let whereConditions = {};
 
+    /*
+    [Sequelize.Op.or]: {
+      owner_user_id: [learnerId, null],
+      is_public: true
+    }
+
+    [Sequelize.Op.or]: {
+      owner_user_id: learnerId,
+      [Sequelize.Op.or]: {
+        owner_user_id: { [Sequelize.Op.is]: null },
+        is_public: true
+      }
+    }
+    */
+
+
     if (filter === 'own' && isAuth) {
       whereConditions.owner_user_id = learnerId;
     } else if (filter === 'saved' && isAuth) {
@@ -38,21 +50,38 @@ async function getAll(req, res) {
         Sequelize.where(Sequelize.literal(literalIsSaved), true),
         {
           [Sequelize.Op.or]: {
-            owner_user_id: null,
-            is_public: true
+            owner_user_id: learnerId,
+            [Sequelize.Op.or]: {
+              owner_user_id: { [Sequelize.Op.is]: null },
+              is_public: true
+            }
           }
         }
       ];
-    } else {
+    } else if (filter === 'top') {
       whereConditions[Sequelize.Op.and] = [
         {
           [Sequelize.Op.or]: {
-            owner_user_id: null,
+            owner_user_id: { [Sequelize.Op.is]: null },
             is_public: true
           }
         },
         Sequelize.where(Sequelize.literal(literalTotalWords), { [Sequelize.Op.gt]: 0 }),
       ];
+    }
+
+    if (partOfName != null && partOfName.trim() != '') {
+      const nameFilter = {
+        name: {
+          [Sequelize.Op.iLike]: `%${partOfName}%`
+        }
+      };
+
+      if (whereConditions[Sequelize.Op.and]) {
+        whereConditions[Sequelize.Op.and].push([nameFilter]);
+      } else {
+        whereConditions[Sequelize.Op.and] = [nameFilter];
+      }
     }
 
     const attributesInclude = [
@@ -65,7 +94,6 @@ async function getAll(req, res) {
 
     if (isAuth) {
       attributesInclude.push(
-        [Sequelize.cast(Sequelize.literal(literalLearned), 'INTEGER'), 'numWordsLearned'],
         [Sequelize.literal(literalIsSaved), 'isSavedForLearning']
       );
     }    
@@ -83,12 +111,12 @@ async function getAll(req, res) {
         include: attributesInclude
       },
       where: whereConditions,
-      // include: [{
-      //   model: User,
-      //   as: 'wordSetOwnerInfo',
-      //   attributes: ['id', 'username'],
-      //   required: false
-      // }],
+      include: [{
+        model: User,
+        as: 'wordSetOwnerInfo',
+        attributes: ['id', 'username'],
+        required: false
+      }],
       replacements: { learnerId },
       order: orderCondition,
       limit: limit,
@@ -121,7 +149,7 @@ async function getOne(req, res) {
     whereConditions[Sequelize.Op.or] = {
       owner_user_id: learnerId,
       [Sequelize.Op.or]: {
-        owner_user_id: null,
+        owner_user_id: { [Sequelize.Op.is]: null },
         is_public: true
       }
     };
@@ -136,12 +164,12 @@ async function getOne(req, res) {
         ]
       },
       include: [
-        // {
-        //   model: User,
-        //   as: 'wordSetOwnerInfo',
-        //   attributes: ['id', 'username'],
-        //   required: false
-        // },
+        {
+          model: User,
+          as: 'wordSetOwnerInfo',
+          attributes: ['id', 'username'],
+          required: false
+        },
         {
           model: Word,
           as: 'wordSetWords',
@@ -153,19 +181,6 @@ async function getOne(req, res) {
             'sentence_translation_uk'
           ],
           through: { attributes: [] },
-          include: isAuth ? [
-            {
-              model: User,
-              as: 'users',
-              where: { id: learnerId },
-              attributes: ['id'],
-              required: false,
-              through: {
-                as: 'progress',
-                attributes: ['word_learning_status_id'],
-              }
-            }
-          ] : []
         }
       ],
       replacements: { learnerId: learnerId ?? null },
@@ -178,27 +193,10 @@ async function getOne(req, res) {
       });
     }
 
-    // A minor tweak for front-end convenience
+    // a minor tweak for front-end convenience
     const result = wordSet.get({ plain: true });
     result.words = result.wordSetWords;
-    delete result.wordSetWords;    
-
-    if (result.words && isAuth) {
-      result.words = result.words.map(word => {
-        // PROBLEM HERE: progress is always undefined
-        const progress = word.users?.[0]?.progress;
-        // consoleError('word: ', word);
-        // return;
-        // consoleError('progress: ', progress);
-
-        return {
-          ...word,
-          isWordLearned: progress?.word_learning_status_id == 6,
-          word_learning_status_id: progress?.word_learning_status_id,
-          users: undefined // Remove the auxiliary array
-        };
-      });
-    }
+    delete result.wordSetWords;
 
     if (result.is_public == null) {
       result.is_public = false;
