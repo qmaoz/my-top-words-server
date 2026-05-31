@@ -84,16 +84,16 @@ async function create(req, res) {
     const { word_text, word_translation_uk, sentence_text, sentence_translation_uk } = req.body;
     const owner_user_id = req.userId;
 
-    const sameWordWithSameOwner = await Word.findOne({ where: {
-      owner_user_id: owner_user_id,
-      word_text: word_text,
-      word_translation_uk: word_translation_uk,
-      sentence_text: sentence_text,
-      sentence_translation_uk: sentence_translation_uk
-    }});
-    if (sameWordWithSameOwner) {
-      throw new Error('Таке саме слово вже є в персональній базі');
-    }
+    // const sameWordWithSameOwner = await Word.findOne({ where: {
+    //   owner_user_id: owner_user_id,
+    //   word_text: word_text,
+    //   word_translation_uk: word_translation_uk,
+    //   sentence_text: sentence_text,
+    //   sentence_translation_uk: sentence_translation_uk
+    // }});
+    // if (sameWordWithSameOwner) {
+    //   throw new Error('Таке саме слово вже є в персональній базі');
+    // }
 
     const newWord = await Word.create({ owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk });
     return res.json(newWord);
