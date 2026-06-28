@@ -1,5 +1,7 @@
-const express = require('express');
 const dotenv = require('dotenv');
+dotenv.config({ quiet: true });
+
+const express = require('express');
 const cors = require('cors');
 
 const sequelize = require('./db');
@@ -10,11 +12,14 @@ const WordController = require('./controllers/WordController.js');
 const UsersWordSetsController = require('./controllers/UsersWordSetsController.js');
 const WordsWordSetsController = require('./controllers/WordsWordSetsController.js');
 
-dotenv.config({ quiet: true });
-
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+const allowedOrigin = process.env.NODE_ENV === 'production' 
+  ? 'https://my-top-words.vercel.app' 
+  : 'http://localhost:5173';
+
+app.use(cors({ origin: allowedOrigin }));
+app.use(express.json({ limit: '1mb' }));
 
 sequelize.sync({ alter: true })
   .then(() => {
@@ -31,21 +36,20 @@ app.get('/userinfo', UserController.verifyToken, UserController.userinfo);
 
 // WordSet routes
 app.post('/word-sets', UserController.verifyToken, Validation.wordSetValidation, WordSetController.create);
-app.post('/word-sets/:id/words', UserController.verifyToken, WordsWordSetsController.updateWordSetWords);
-app.get('/word-sets', UserController.checkAuthOptional, WordSetController.getAll);
-app.get('/word-sets/:id', UserController.checkAuthOptional, WordSetController.getOne);
-app.patch('/word-sets/:id', UserController.verifyToken, Validation.wordSetValidation, WordSetController.update);
-app.patch('/word-sets/toggle-save/:id', UserController.verifyToken, UsersWordSetsController.toggleSaving);
-app.patch('/word-sets/:wordSetId/words/:wordId', UserController.verifyToken, WordsWordSetsController.toggleIncludeWordInWordSet);
-app.delete('/word-sets/:id', UserController.verifyToken, WordSetController.remove);
+app.get('/word-sets', UserController.verifyTokenOptional, WordSetController.getAll);
+app.get('/word-sets/:wordSetId', UserController.verifyTokenOptional, WordSetController.getOne);
+app.patch('/word-sets/:wordSetId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, Validation.wordSetValidation, WordSetController.update);
+app.patch('/word-sets/toggle-save/:wordSetId', UserController.verifyToken, UsersWordSetsController.toggleSaving);
+app.patch('/word-sets/:wordSetId/words/:wordId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordsWordSetsController.toggleIncludeWordInWordSet);
+app.delete('/word-sets/:wordSetId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordSetController.remove);
 
 
 
 // Word routes
-app.post('/words', Validation.wordValidation, UserController.verifyToken, WordController.create);
-app.get('/words', UserController.checkAuthOptional, WordController.getAll);
-app.patch('/words/:id', UserController.verifyToken, WordController.update);
-app.delete('/words/:id', UserController.verifyToken, WordController.remove);
+app.post('/words', UserController.verifyToken, Validation.wordValidation, WordController.create);
+app.get('/words', UserController.verifyTokenOptional, WordController.getAll);
+app.patch('/words/:wordId', UserController.verifyToken, WordController.verifyWordAuthor, Validation.wordValidation, WordController.update);
+app.delete('/words/:wordId', UserController.verifyToken, WordController.verifyWordAuthor, WordController.remove);
 
 
 

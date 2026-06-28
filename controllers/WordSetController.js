@@ -1,12 +1,48 @@
 const { Sequelize } = require('sequelize');
 const { validationResult } = require('express-validator');
 
-const { WordSet, User, Word, WordsWordSets } = require('../models/models');
+const { WordSet, User, Word } = require('../models/models');
 const { consoleError } = require('../utils');
 
 const literalPopularity = '(SELECT COUNT(*) FROM users__word_sets AS uws WHERE uws.word_set_id = "word-sets".id)';
 const literalTotalWords = '(SELECT COUNT(*) FROM words__word_sets AS wws WHERE wws.word_set_id = "word-sets".id)';
 const literalIsSaved = 'EXISTS (SELECT 1 FROM users__word_sets WHERE word_set_id = "word-sets".id AND user_id = :learnerId)';
+
+async function verifyWordSetAuthor(req, res, next) {
+  try {
+    const { wordSetId } = req.params;
+    const userId = req.userId;
+    if (userId == null) {
+      return res.status(401).json({
+        source: 'Помилка під час перевірки автора набору',
+        message: 'Доступ заборонено'
+      });
+    }
+    
+    const wordSet = await WordSet.findByPk(wordSetId);
+    if (!wordSet) {
+      return res.status(404).json({
+        source: 'Помилка під час перевірки автора набору',
+        message: `Набір #${wordSetId} не знайдено`
+      });
+    }
+
+    if (wordSet.owner_user_id != userId) {
+      return res.status(401).json({
+        source: 'Помилка під час перевірки автора набору',
+        message: 'Доступ заборонено'
+      });
+    }
+
+    next();
+  } catch (error) {
+    consoleError('Помилка під час перевірки автора набору: ' + error.message);
+    res.status(500).json({
+      source: 'Помилка під час перевірки автора набору',
+      message: error.message
+    });
+  }
+}
 
 async function getAll(req, res) {
   try {
@@ -15,9 +51,6 @@ async function getAll(req, res) {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
     const { filter, partOfName } = req.query; // possible filters: 'top' / 'saved' / 'own'
-    // console.log('partOfName: ', partOfName);
-    // console.log('filter: ', filter);
-    // console.log('learnerId: ', learnerId);
 
     if (!isAuth && (filter == 'own' || filter == 'saved')) {
       throw new Error('Помилка авторизації');
@@ -141,11 +174,11 @@ async function getAll(req, res) {
 
 async function getOne(req, res) {
   try {
-    const { id } = req.params;
+    const { wordSetId } = req.params;
     const learnerId = req.userId ?? null;
     const isAuth = learnerId != null;
 
-    let whereConditions = { id };
+    let whereConditions = { id: wordSetId };
     whereConditions[Sequelize.Op.or] = {
       owner_user_id: learnerId,
       [Sequelize.Op.or]: {
@@ -189,7 +222,7 @@ async function getOne(req, res) {
     if (!wordSet) {
       return res.status(404).json({
         source: 'Помилка під час отримання набору',
-        message: `Набір #${id} не знайдено або доступ до нього заборонено`
+        message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
       });
     }
 
@@ -248,11 +281,11 @@ async function create(req, res) {
 
 async function remove(req, res) {
   try {
-    const { id } = req.params;
+    const { wordSetId } = req.params;
 
     await WordSet.destroy({
       where: {
-        id: id
+        id: wordSetId
       }
     });
 
@@ -270,18 +303,18 @@ async function remove(req, res) {
 
 async function update(req, res) {
   try {
-    const { id } = req.params;
+    const { wordSetId } = req.params;
     const { name , setIsPublic } = req.body;
     const errors = validationResult(req);
 
     const wordSet = await WordSet.findOne({
-      where: { id }
+      where: { id: wordSetId }
     });
 
     if (!wordSet) {
       return res.status(404).json({
         source: 'Помилка під час оновлення набору',
-        message: `Набір #${id} не знайдено або доступ до нього заборонено`
+        message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
       });
     }
     
@@ -305,13 +338,13 @@ async function update(req, res) {
     }
 
     const [updatedRowsCount] = await WordSet.update(updateData, {
-      where: { id }
+      where: { id: wordSetId }
     });
 
     if (updatedRowsCount === 0) {    
       return res.status(404).json({
         source: 'Помилка під час оновлення набору',
-        message: `Набір #${id} не знайдено або доступ до нього заборонено`
+        message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
       });
     }
 
@@ -325,4 +358,4 @@ async function update(req, res) {
   }
 }
 
-module.exports = { getAll, getOne, create, remove, update };
+module.exports = { verifyWordSetAuthor, getAll, getOne, create, remove, update };

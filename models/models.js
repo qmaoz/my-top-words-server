@@ -1,10 +1,6 @@
 const { DataTypes } = require('sequelize');
-const dotenv = require('dotenv');
 
 const sequelize = require('../db');
-
-
-dotenv.config({ quiet: true });
 
 const User = sequelize.define('users',
   {
@@ -128,8 +124,7 @@ User.hasMany(Word, {
 Word.belongsTo(User, {
   foreignKey: 'owner_user_id',
   as: 'wordOwnerInfo',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
+  onDelete: 'CASCADE'
 });
 
 User.hasMany(WordSet, {
@@ -138,39 +133,33 @@ User.hasMany(WordSet, {
 WordSet.belongsTo(User, {
   foreignKey: 'owner_user_id',
   as: 'wordSetOwnerInfo',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
+  onDelete: 'CASCADE'
 });
 
 User.belongsToMany(WordSet, {
   through: UsersWordSets,
   foreignKey: 'user_id',
   as: 'userWordSets',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
+  onDelete: 'CASCADE'
 });
 WordSet.belongsToMany(User, {
   through: UsersWordSets,
   foreignKey: 'word_set_id',
   as: 'wordSetUsers',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
+  onDelete: 'CASCADE'
 });
 
 Word.belongsToMany(WordSet, {
   through: WordsWordSets,
   foreignKey: 'word_id',
-  // as: 'wordSets', // HERE: this was a previous version
   as: 'wordWordSets',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
+  onDelete: 'CASCADE'
 });
 WordSet.belongsToMany(Word, {
   through: WordsWordSets,
   foreignKey: 'word_set_id',
   as: 'wordSetWords',
-  onDelete: 'CASCADE',
-  onUpdate: 'CASCADE'
+  onDelete: 'CASCADE'
 });
 
 

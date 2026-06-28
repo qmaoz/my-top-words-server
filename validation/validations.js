@@ -58,20 +58,8 @@ const loginValidation = [
     .withMessage(messages['not allowed characters in username']),
   body('password')
     .trim()
-    .isLength({ min: 12, max: 20 })
-    .withMessage(messages['incorrect password length'])
-
-    .matches(/^(?=.*[a-z]).*$/)
-    .withMessage(messages['minimum one small letter in password'])
-
-    .matches(/^(?=.*[A-Z]).*$/)
-    .withMessage(messages['minimum one big letter in password'])
-
-    .matches(/^(?=.*[0-9]).*$/)
-    .withMessage(messages['minimum one digit in password'])
-
-    .matches(/^(?=.*[!@#$%^&*()_=+\/\\~`'"-]).*$/)
-    .withMessage(messages['minimum one special character in password']),
+    .notEmpty()
+    .withMessage('Пароль не може бути порожнім'),
 ];
 
 const wordSetValidation = [

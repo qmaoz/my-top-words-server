@@ -3,7 +3,7 @@ const { consoleError } = require('../utils');
 
 async function toggleSaving(req, res) {
   try {
-    const wordSetId = req.params.id;
+    const { wordSetId } = req.params;
     const userId = req.userId; // retrieve from the verifyToken middleware
 
     const existingRecord = await UsersWordSets.findOne({

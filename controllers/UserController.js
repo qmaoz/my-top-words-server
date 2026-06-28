@@ -1,13 +1,9 @@
 const { validationResult } = require('express-validator'); 
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
 
 const { User } = require('../models/models');
 const { consoleError } = require('../utils');
-
-
-dotenv.config({ quiet: true });
 
 async function register(req, res) {
   try {
@@ -127,20 +123,20 @@ function verifyToken (req, res, next) {
       token.split(' ')[1],
       process.env.JWT_SECRET_KEY
     );
-
+    
     // pass the decoded user ID to the next middleware/controller
     req.userId = decoded.userId;
     next();
   } catch (error) {
     consoleError('Помилка під час перевірки токена: ' + error.message);
-    res.status(500).json({
+    res.status(401).json({
       source: 'Помилка під час перевірки токена',
       message: error.message
     });
   }
 }
 
-function checkAuthOptional (req, res, next) {
+function verifyTokenOptional (req, res, next) {
   const token = req.header('Authorization');
 
   if (!token) {
@@ -163,4 +159,4 @@ function checkAuthOptional (req, res, next) {
   }
 }
 
-module.exports = { register, login, userinfo, verifyToken, checkAuthOptional };
+module.exports = { register, login, userinfo, verifyToken, verifyTokenOptional };

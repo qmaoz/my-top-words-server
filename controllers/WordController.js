@@ -1,8 +1,43 @@
-const { Sequelize } = require('sequelize');
 const { validationResult } = require('express-validator'); 
 
 const { Word, User } = require('../models/models');
 const { consoleError } = require('../utils');
+
+async function verifyWordAuthor(req, res, next) {
+  try {
+    const { wordId } = req.params;
+    const userId = req.userId;
+    if (userId == null) {
+      return res.status(401).json({
+        source: 'Помилка під час перевірки автора слова',
+        message: 'Доступ заборонено'
+      });
+    }
+
+    const word = await Word.findByPk(wordId);
+    if (!word) {
+      return res.status(404).json({
+        source: 'Помилка під час перевірки автора слова',
+        message: `Слово #${wordId} не знайдено`
+      });
+    }
+
+    if (word.owner_user_id != userId) {
+      return res.status(401).json({
+        source: 'Помилка під час перевірки автора слова',
+        message: 'Доступ заборонено'
+      });
+    }
+
+    next();
+  } catch (error) {
+    consoleError('Помилка під час перевірки автора слова: ' + error.message);
+    res.status(500).json({
+      source: 'Помилка під час перевірки автора слова',
+      message: error.message
+    });
+  }
+}
 
 async function getAll(req, res) {
   try {
@@ -84,17 +119,6 @@ async function create(req, res) {
     const { word_text, word_translation_uk, sentence_text, sentence_translation_uk } = req.body;
     const owner_user_id = req.userId;
 
-    // const sameWordWithSameOwner = await Word.findOne({ where: {
-    //   owner_user_id: owner_user_id,
-    //   word_text: word_text,
-    //   word_translation_uk: word_translation_uk,
-    //   sentence_text: sentence_text,
-    //   sentence_translation_uk: sentence_translation_uk
-    // }});
-    // if (sameWordWithSameOwner) {
-    //   throw new Error('Таке саме слово вже є в персональній базі');
-    // }
-
     const newWord = await Word.create({ owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk });
     return res.json(newWord);
   } catch (error) {
@@ -108,7 +132,7 @@ async function create(req, res) {
 
 async function remove(req, res) {
   try {
-    const { id: wordId } = req.params;
+    const { wordId } = req.params;
 
     await Word.destroy({
       where: {
@@ -128,12 +152,21 @@ async function remove(req, res) {
 
 async function update(req, res) {
   try {
-    const { id: wordId } = req.params;
-    const { owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk } = req.body;
+    const errors = validationResult(req);
+    
+    if (!errors.isEmpty()) {
+      consoleError('Помилка під час оновлення слова:', errors.array()[0].msg);
+      return res.status(400).json({
+        source: 'Помилка під час оновлення слова',
+        message: errors.array()[0].msg
+      });
+    }
 
-    await Word.update(
+    const { wordId } = req.params;
+    const { word_text, word_translation_uk, sentence_text, sentence_translation_uk } = req.body;
+
+    const updatedRow = await Word.update(
       {
-        owner_user_id: owner_user_id,
         word_text: word_text,
         word_translation_uk: word_translation_uk,
         sentence_text: sentence_text,
@@ -142,16 +175,25 @@ async function update(req, res) {
       {
         where: {
           id: wordId
-        }
+        },
+        returning: true
       },
     );
 
-    const updatedWord = { id: wordId, owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk };
-
-    res.json({
-      success: true,
-      updatedWord
-    });
+    if (updatedRow) {
+      // console.log('updatedWord: ', updatedWord[1][0]?.dataValues);
+      const updatedWord = updatedRow[1][0]?.dataValues;
+      // const updatedWord1 = { id: wordId, owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk };
+      res.json({
+        success: true,
+        updatedWord
+      });
+    } else {
+      res.status(500).json({
+        source: 'Помилка під час оновлення слова',
+        message: 'Оновлення не відбулося'
+      });
+    }
   } catch (error) {
     consoleError('Помилка під час оновлення слова: ' + error.message);
     res.status(500).json({
@@ -161,4 +203,4 @@ async function update(req, res) {
   }
 }
 
-module.exports = { getAll, create, remove, update };
+module.exports = { verifyWordAuthor, getAll, create, remove, update };
