@@ -116,6 +116,31 @@ const UsersWordSets = sequelize.define('users__word_sets',
   },
 );
 
+const LearnedUserWords = sequelize.define('learned_user_words',
+  {
+    user_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    word_id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      references: {
+        model: 'words',
+        key: 'id'
+      }
+    },
+  },
+  {
+    timestamps: false,
+    tableName: 'learned_user_words'
+  },
+);
+
 
 
 User.hasMany(Word, {
@@ -162,6 +187,19 @@ WordSet.belongsToMany(Word, {
   onDelete: 'CASCADE'
 });
 
+User.belongsToMany(Word, {
+  through: LearnedUserWords,
+  foreignKey: 'user_id',
+  as: 'learnedWords',
+  onDelete: 'CASCADE'
+});
+Word.belongsToMany(User, {
+  through: LearnedUserWords,
+  foreignKey: 'word_id',
+  as: 'learnedByUsers',
+  onDelete: 'CASCADE'
+});
+
 
 
 WordSet.prototype.toJSON = function () {
@@ -181,5 +219,5 @@ WordSet.prototype.toJSON = function () {
 
 
 module.exports = {
-  User, Word, WordSet, WordsWordSets, UsersWordSets
+  User, Word, WordSet, WordsWordSets, UsersWordSets, LearnedUserWords
 };

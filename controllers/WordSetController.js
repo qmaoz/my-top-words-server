@@ -7,6 +7,7 @@ const { consoleError } = require('../utils');
 const literalPopularity = '(SELECT COUNT(*) FROM users__word_sets AS uws WHERE uws.word_set_id = "word-sets".id)';
 const literalTotalWords = '(SELECT COUNT(*) FROM words__word_sets AS wws WHERE wws.word_set_id = "word-sets".id)';
 const literalIsSaved = 'EXISTS (SELECT 1 FROM users__word_sets WHERE word_set_id = "word-sets".id AND user_id = :learnerId)';
+const literalIsLearned = 'EXISTS (SELECT 1 FROM learned_user_words AS luw WHERE luw.word_id = "wordSetWords".id AND luw.user_id = :learnerId)';
 
 async function verifyWordSetAuthor(req, res, next) {
   try {
@@ -211,7 +212,10 @@ async function getOne(req, res) {
             'word_text',
             'word_translation_uk',
             'sentence_text',
-            'sentence_translation_uk'
+            'sentence_translation_uk',
+            ...(isAuth ? [
+              [Sequelize.literal(literalIsLearned), 'isLearned']
+            ] : [])
           ],
           through: { attributes: [] },
         }
@@ -221,7 +225,7 @@ async function getOne(req, res) {
 
     if (!wordSet) {
       return res.status(404).json({
-        source: 'Помилка під час отримання набору',
+        source: 'Помилка під час отримання набору #1',
         message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
       });
     }
@@ -237,9 +241,9 @@ async function getOne(req, res) {
 
     return res.json(result);
   } catch (error) {
-    consoleError('Помилка під час отримання набору: ' + error.message);
+    consoleError('Помилка під час отримання набору #2: ' + error.message);
     res.status(500).json({
-      source: 'Помилка під час отримання набору',
+      source: 'Помилка під час отримання набору #2',
       message: error.message
     });
   }

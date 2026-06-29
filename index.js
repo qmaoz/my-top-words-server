@@ -11,6 +11,7 @@ const WordSetController = require('./controllers/WordSetController.js');
 const WordController = require('./controllers/WordController.js');
 const UsersWordSetsController = require('./controllers/UsersWordSetsController.js');
 const WordsWordSetsController = require('./controllers/WordsWordSetsController.js');
+const LearnedUserWordsController = require('./controllers/LearnedUserWordsController.js');
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.delete('/word-sets/:wordSetId', UserController.verifyToken, WordSetControlle
 // Word routes
 app.post('/words', UserController.verifyToken, Validation.wordValidation, WordController.create);
 app.get('/words', UserController.verifyTokenOptional, WordController.getAll);
+app.patch('/words/toggle-learned/:wordId', UserController.verifyToken, LearnedUserWordsController.toggleLearned);
 app.patch('/words/:wordId', UserController.verifyToken, WordController.verifyWordAuthor, Validation.wordValidation, WordController.update);
 app.delete('/words/:wordId', UserController.verifyToken, WordController.verifyWordAuthor, WordController.remove);
 
