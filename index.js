@@ -12,6 +12,10 @@ const WordController = require('./controllers/WordController.js');
 const UsersWordSetsController = require('./controllers/UsersWordSetsController.js');
 const WordsWordSetsController = require('./controllers/WordsWordSetsController.js');
 const LearnedUserWordsController = require('./controllers/LearnedUserWordsController.js');
+const StatsController = require('./controllers/StatsController.js');
+const FeedbackController = require('./controllers/FeedbackController.js');
+const AdminController = require('./controllers/AdminController.js');
+const { verifyAdmin } = require('./middleware/admin.js');
 
 const app = express();
 
@@ -32,6 +36,16 @@ sequelize.sync({ alter: true })
 app.post('/auth/register', Validation.registerValidation, UserController.register);
 app.post('/auth/login', Validation.loginValidation, UserController.login);
 app.get('/userinfo', UserController.verifyToken, UserController.userinfo);
+
+app.get('/stats', StatsController.getPublic);
+
+app.post('/feedback', UserController.verifyTokenOptional, Validation.feedbackValidation, FeedbackController.create);
+
+app.get('/admin/overview', UserController.verifyToken, verifyAdmin, AdminController.getOverview);
+app.get('/admin/feedback', UserController.verifyToken, verifyAdmin, FeedbackController.getAll);
+app.patch('/admin/feedback/:id', UserController.verifyToken, verifyAdmin, Validation.feedbackUpdateValidation, FeedbackController.update);
+app.get('/admin/users', UserController.verifyToken, verifyAdmin, AdminController.getUsers);
+app.delete('/admin/users/:userId', UserController.verifyToken, verifyAdmin, AdminController.deleteUser);
 
 
 

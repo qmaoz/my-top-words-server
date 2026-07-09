@@ -99,4 +99,43 @@ const wordValidation = [
     .withMessage('Переклад речення повинен містити щонайменше 1 символ!')
 ];
 
-module.exports = { registerValidation, loginValidation, wordSetValidation, wordValidation };
+const FEEDBACK_TYPES = ['typo', 'bug', 'suggestion', 'other'];
+const FEEDBACK_STATUSES = ['queued', 'in_progress', 'done'];
+
+const feedbackValidation = [
+  body('type')
+    .trim()
+    .isIn(FEEDBACK_TYPES)
+    .withMessage('Некоректний тип повідомлення'),
+  body('message')
+    .trim()
+    .isLength({ min: 10, max: 2000 })
+    .withMessage('Текст повідомлення має містити від 10 до 2000 символів'),
+  body('page_url')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Адреса сторінки занадто довга'),
+];
+
+const feedbackUpdateValidation = [
+  body('status')
+    .optional()
+    .trim()
+    .isIn(FEEDBACK_STATUSES)
+    .withMessage('Некоректний статус'),
+  body('admin_note')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Примітка адміністратора занадто довга'),
+];
+
+module.exports = {
+  registerValidation,
+  loginValidation,
+  wordSetValidation,
+  wordValidation,
+  feedbackValidation,
+  feedbackUpdateValidation,
+};

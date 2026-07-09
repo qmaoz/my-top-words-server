@@ -7,6 +7,7 @@ const { consoleError } = require('../utils');
 const literalPopularity = '(SELECT COUNT(*) FROM users__word_sets AS uws WHERE uws.word_set_id = "word-sets".id)';
 const literalTotalWords = '(SELECT COUNT(*) FROM words__word_sets AS wws WHERE wws.word_set_id = "word-sets".id)';
 const literalIsSaved = 'EXISTS (SELECT 1 FROM users__word_sets WHERE word_set_id = "word-sets".id AND user_id = :learnerId)';
+const literalLearnedWordsCount = '(SELECT COUNT(*) FROM learned_user_words AS luw INNER JOIN words__word_sets AS wws ON wws.word_id = luw.word_id WHERE wws.word_set_id = "word-sets".id AND luw.user_id = :learnerId)';
 const literalIsLearned = 'EXISTS (SELECT 1 FROM learned_user_words AS luw WHERE luw.word_id = "wordSetWords".id AND luw.user_id = :learnerId)';
 
 async function verifyWordSetAuthor(req, res, next) {
@@ -128,7 +129,8 @@ async function getAll(req, res) {
 
     if (isAuth) {
       attributesInclude.push(
-        [Sequelize.literal(literalIsSaved), 'isSavedForLearning']
+        [Sequelize.literal(literalIsSaved), 'isSavedForLearning'],
+        [Sequelize.cast(Sequelize.literal(literalLearnedWordsCount), 'INTEGER'), 'learnedWordsCount']
       );
     }    
 
@@ -193,7 +195,8 @@ async function getOne(req, res) {
       attributes: {
         include: [
           ...(isAuth ? [
-            [Sequelize.literal(literalIsSaved), 'isSavedForLearning']
+            [Sequelize.literal(literalIsSaved), 'isSavedForLearning'],
+            [Sequelize.cast(Sequelize.literal(literalLearnedWordsCount), 'INTEGER'), 'learnedWordsCount']
           ] : [])
         ]
       },

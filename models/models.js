@@ -141,6 +141,51 @@ const LearnedUserWords = sequelize.define('learned_user_words',
   },
 );
 
+const FeedbackMessage = sequelize.define('feedback_messages',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    type: {
+      type: DataTypes.STRING(32),
+      allowNull: false,
+    },
+    message: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    page_url: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.STRING(32),
+      allowNull: false,
+      defaultValue: 'queued',
+    },
+    admin_note: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+  },
+  {
+    timestamps: true,
+    tableName: 'feedback_messages',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+  },
+);
+
 
 
 User.hasMany(Word, {
@@ -200,6 +245,16 @@ Word.belongsToMany(User, {
   onDelete: 'CASCADE'
 });
 
+User.hasMany(FeedbackMessage, {
+  foreignKey: 'user_id',
+  onDelete: 'SET NULL',
+});
+FeedbackMessage.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'author',
+  onDelete: 'SET NULL',
+});
+
 
 
 WordSet.prototype.toJSON = function () {
@@ -219,5 +274,5 @@ WordSet.prototype.toJSON = function () {
 
 
 module.exports = {
-  User, Word, WordSet, WordsWordSets, UsersWordSets, LearnedUserWords
+  User, Word, WordSet, WordsWordSets, UsersWordSets, LearnedUserWords, FeedbackMessage
 };
