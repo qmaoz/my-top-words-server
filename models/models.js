@@ -75,6 +75,11 @@ const WordSet = sequelize.define('word-sets',
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false
+    },
+    visibility: {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: 'private',
     }
   },
   {
@@ -257,6 +262,8 @@ FeedbackMessage.belongsTo(User, {
 
 
 
+const { normalizeVisibility } = require('../utils/wordSetVisibility');
+
 WordSet.prototype.toJSON = function () {
   const values = { ...this.get() };
   
@@ -267,6 +274,9 @@ WordSet.prototype.toJSON = function () {
   if (values.is_public == null) {
     values.is_public = false;
   }
+
+  values.visibility = normalizeVisibility(values);
+  values.is_public = values.visibility === 'public';
 
   return values;
 };

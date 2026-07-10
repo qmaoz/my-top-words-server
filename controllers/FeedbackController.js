@@ -7,6 +7,75 @@ const { consoleError } = require('../utils');
 const FEEDBACK_TYPES = ['typo', 'bug', 'suggestion', 'other'];
 const FEEDBACK_STATUSES = ['queued', 'in_progress', 'done'];
 
+const FEEDBACK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const FEEDBACK_RATE_LIMIT_AUTH = 10;
+const FEEDBACK_RATE_LIMIT_GUEST = 3;
+
+const guestFeedbackLimits = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function cleanupGuestLimits(now) {
+  for (const [ip, entry] of guestFeedbackLimits.entries()) {
+    if (entry.resetAt <= now) {
+      guestFeedbackLimits.delete(ip);
+    }
+  }
+}
+
+async function assertFeedbackRateLimit(req, res) {
+  const now = Date.now();
+  const windowStart = new Date(now - FEEDBACK_RATE_LIMIT_WINDOW_MS);
+
+  if (req.userId) {
+    const recentCount = await FeedbackMessage.count({
+      where: {
+        user_id: req.userId,
+        created_at: { [Op.gte]: windowStart },
+      },
+    });
+
+    if (recentCount >= FEEDBACK_RATE_LIMIT_AUTH) {
+      res.status(429).json({
+        source: 'Помилка під час надсилання повідомлення',
+        message: 'Забагато повідомлень за годину. Спробуйте пізніше.',
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  cleanupGuestLimits(now);
+
+  const ip = getClientIp(req);
+  const entry = guestFeedbackLimits.get(ip);
+
+  if (!entry || entry.resetAt <= now) {
+    guestFeedbackLimits.set(ip, { count: 1, resetAt: now + FEEDBACK_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= FEEDBACK_RATE_LIMIT_GUEST) {
+    res.status(429).json({
+      source: 'Помилка під час надсилання повідомлення',
+      message: 'Забагато повідомлень за годину. Спробуйте пізніше.',
+    });
+    return false;
+  }
+
+  entry.count += 1;
+  return true;
+}
+
 async function create(req, res) {
   try {
     const errors = validationResult(req);
@@ -17,6 +86,9 @@ async function create(req, res) {
         message: errors.array()[0].msg,
       });
     }
+
+    const allowed = await assertFeedbackRateLimit(req, res);
+    if (!allowed) return;
 
     const { type, message, page_url: pageUrl } = req.body;
 

@@ -1,0 +1,85 @@
+@startuml my-top-words-er
+' ER-діаграма бази даних My Top Words
+' Перегляд: розширення PlantUML у VS Code/Cursor, або https://www.plantuml.com/plantuml
+
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #F8FAFC
+  BorderColor #1976D2
+}
+
+title My Top Words — ER-діаграма
+
+entity "users" as users {
+  * **id** : INTEGER <<PK>>
+  --
+  * username : VARCHAR <<UNIQUE>>
+  * password : VARCHAR
+}
+
+entity "words" as words {
+  * **id** : INTEGER <<PK>>
+  --
+  * owner_user_id : INTEGER <<FK>>
+  * word_text : VARCHAR
+  * word_translation_uk : VARCHAR
+  * sentence_text : VARCHAR
+  * sentence_translation_uk : VARCHAR
+}
+
+entity "word_sets" as word_sets {
+  * **id** : INTEGER <<PK>>
+  --
+  * owner_user_id : INTEGER <<FK>>
+  * name : VARCHAR
+  * is_public : BOOLEAN
+}
+
+entity "words__word_sets" as words_word_sets {
+  * **word_id** : INTEGER <<PK, FK>>
+  * **word_set_id** : INTEGER <<PK, FK>>
+}
+
+entity "users__word_sets" as users_word_sets {
+  * **user_id** : INTEGER <<PK, FK>>
+  * **word_set_id** : INTEGER <<PK, FK>>
+}
+
+entity "learned_user_words" as learned_user_words {
+  * **user_id** : INTEGER <<PK, FK>>
+  * **word_id** : INTEGER <<PK, FK>>
+}
+
+entity "feedback_messages" as feedback_messages {
+  * **id** : INTEGER <<PK>>
+  --
+  user_id : INTEGER <<FK, NULL>>
+  * type : VARCHAR(32)
+  * message : TEXT
+  page_url : VARCHAR(500)
+  * status : VARCHAR(32)
+  admin_note : TEXT
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+' Власність (1:N) — хто створив слово / набір
+users ||--o{ words : "власник слів"
+users ||--o{ word_sets : "власник наборів"
+
+' Збережені набори (M:N) — чужий публічний набір можна зберегти собі
+users ||--o{ users_word_sets
+word_sets ||--o{ users_word_sets
+
+' Склад набору (M:N)
+words ||--o{ words_word_sets
+word_sets ||--o{ words_word_sets
+
+' Вивчені слова (M:N)
+users ||--o{ learned_user_words
+words ||--o{ learned_user_words
+
+' Зворотний зв'язок (1:N, автор необов'язковий)
+users |o--o{ feedback_messages : "автор"
+
+@enduml

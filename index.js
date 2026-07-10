@@ -19,7 +19,11 @@ const { verifyAdmin } = require('./middleware/admin.js');
 
 const app = express();
 
-const allowedOrigin = process.env.NODE_ENV === 'production' 
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+const allowedOrigin = process.env.NODE_ENV === 'production'
   ? 'https://my-top-words.vercel.app' 
   : 'http://localhost:5173';
 
@@ -27,8 +31,17 @@ app.use(cors({ origin: allowedOrigin }));
 app.use(express.json({ limit: '1mb' }));
 
 sequelize.sync({ alter: true })
-  .then(() => {
+  .then(async () => {
     console.log('Database synced');
+    try {
+      await sequelize.query(`
+        UPDATE word_sets
+        SET visibility = CASE WHEN is_public = TRUE THEN 'public' ELSE 'private' END
+        WHERE visibility IS NULL OR visibility = ''
+      `);
+    } catch (migrationError) {
+      console.error('Visibility migration skipped: ', migrationError.message);
+    }
   })
   .catch(err => console.error('Error syncing database: ', err));
 
@@ -56,6 +69,7 @@ app.get('/word-sets/:wordSetId', UserController.verifyTokenOptional, WordSetCont
 app.patch('/word-sets/:wordSetId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, Validation.wordSetValidation, WordSetController.update);
 app.patch('/word-sets/toggle-save/:wordSetId', UserController.verifyToken, UsersWordSetsController.toggleSaving);
 app.patch('/word-sets/:wordSetId/words/:wordId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordsWordSetsController.toggleIncludeWordInWordSet);
+app.post('/word-sets/:wordSetId/words/bulk', UserController.verifyToken, WordSetController.verifyWordSetAuthor, Validation.bulkWordsValidation, WordsWordSetsController.bulkImportWords);
 app.delete('/word-sets/:wordSetId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordSetController.remove);
 
 

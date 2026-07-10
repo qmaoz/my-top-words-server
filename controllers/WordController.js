@@ -1,7 +1,9 @@
-const { validationResult } = require('express-validator'); 
+const { validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 
-const { Word, User } = require('../models/models');
+const { Word, User, WordSet } = require('../models/models');
 const { consoleError } = require('../utils');
+const { buildWordEntryKey } = require('../utils/wordEntries');
 
 async function verifyWordAuthor(req, res, next) {
   try {
@@ -165,13 +167,62 @@ async function update(req, res) {
     const { wordId } = req.params;
     const { word_text, word_translation_uk, sentence_text, sentence_translation_uk } = req.body;
 
+    const word = await Word.findByPk(wordId);
+    if (!word) {
+      return res.status(404).json({
+        source: 'Помилка під час оновлення слова',
+        message: `Слово #${wordId} не знайдено`,
+      });
+    }
+
+    const nextValues = {
+      word_text,
+      word_translation_uk,
+      sentence_text,
+      sentence_translation_uk,
+    };
+
+    const hasChanges = Object.entries(nextValues).some(
+      ([key, value]) => String(value ?? '').trim() !== String(word[key] ?? '').trim(),
+    );
+
+    if (!hasChanges) {
+      return res.json({
+        success: true,
+        unchanged: true,
+        updatedWord: word.get({ plain: true }),
+      });
+    }
+
+    const wordSetLinks = await word.getWordWordSets({ attributes: ['id'] });
+    const wordSetIds = wordSetLinks.map((item) => item.id);
+
+    if (wordSetIds.length > 0) {
+      const nextKey = buildWordEntryKey(nextValues);
+      const siblings = await Word.findAll({
+        attributes: ['id', 'word_text', 'word_translation_uk', 'sentence_text', 'sentence_translation_uk'],
+        where: { id: { [Op.ne]: wordId } },
+        include: [{
+          model: WordSet,
+          as: 'wordWordSets',
+          where: { id: { [Op.in]: wordSetIds } },
+          attributes: [],
+          through: { attributes: [] },
+          required: true,
+        }],
+      });
+
+      const duplicate = siblings.find((item) => buildWordEntryKey(item) === nextKey);
+      if (duplicate) {
+        return res.status(409).json({
+          source: 'Помилка під час оновлення слова',
+          message: 'Такий запис вже є в наборі',
+        });
+      }
+    }
+
     const updatedRow = await Word.update(
-      {
-        word_text: word_text,
-        word_translation_uk: word_translation_uk,
-        sentence_text: sentence_text,
-        sentence_translation_uk: sentence_translation_uk
-      },
+      nextValues,
       {
         where: {
           id: wordId
@@ -181,9 +232,7 @@ async function update(req, res) {
     );
 
     if (updatedRow) {
-      // console.log('updatedWord: ', updatedWord[1][0]?.dataValues);
       const updatedWord = updatedRow[1][0]?.dataValues;
-      // const updatedWord1 = { id: wordId, owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk };
       res.json({
         success: true,
         updatedWord

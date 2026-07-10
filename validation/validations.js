@@ -3,7 +3,6 @@ const { User } = require('../models/models');
 
 const messages = {
   'incorrect username length': 'Ім\'я користувача має містити від 1 до 20 символів',
-  'not allowed characters in username': 'Ім\'я користувача може містити тільки літери, цифри, дефіс або нижнє підкреслення!',
   'username already taken': 'Це ім\'я користувача вже використовується',
 
   'incorrect password length': 'Пароль має містити від 12 до 20 символів',
@@ -19,8 +18,6 @@ const registerValidation = [
     .trim()
     .isLength({ min: 1, max: 20 })
     .withMessage(messages['incorrect username length'])
-    .matches(/^[\w-]*$/)
-    .withMessage(messages['not allowed characters in username'])
     .custom(async value => {
       const user = await User.findOne({ where: { username: value } });
       if (user) {
@@ -53,9 +50,7 @@ const loginValidation = [
   body('username')
     .trim()
     .isLength({ min: 1, max: 20 })
-    .withMessage(messages['incorrect username length'])
-    .matches(/^[\w-]*$/)
-    .withMessage(messages['not allowed characters in username']),
+    .withMessage(messages['incorrect username length']),
   body('password')
     .trim()
     .notEmpty()
@@ -69,7 +64,12 @@ const wordSetValidation = [
     .isString()
     .withMessage('Ім\'я набору має бути рядком!')
     .isLength({ min: 1, max: 30 })
-    .withMessage('Назва набору повинна містити від 1 до 30 символів!')
+    .withMessage('Назва набору повинна містити від 1 до 30 символів!'),
+  body('visibility')
+    .optional()
+    .trim()
+    .isIn(['private', 'unlisted', 'public'])
+    .withMessage('Некоректний рівень доступу до набору'),
 ];
 
 const wordValidation = [
@@ -109,8 +109,8 @@ const feedbackValidation = [
     .withMessage('Некоректний тип повідомлення'),
   body('message')
     .trim()
-    .isLength({ min: 10, max: 2000 })
-    .withMessage('Текст повідомлення має містити від 10 до 2000 символів'),
+    .isLength({ min: 1, max: 2000 })
+    .withMessage('Текст повідомлення має містити від 1 до 2000 символів'),
   body('page_url')
     .optional({ values: 'falsy' })
     .trim()
@@ -131,6 +131,36 @@ const feedbackUpdateValidation = [
     .withMessage('Примітка адміністратора занадто довга'),
 ];
 
+const bulkWordsValidation = [
+  body('words')
+    .isArray({ min: 1, max: 100 })
+    .withMessage('Потрібен масив від 1 до 100 слів'),
+  body('words.*.word_text')
+    .trim()
+    .isString()
+    .withMessage('Слово має бути рядком')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Слово має містити від 1 до 255 символів'),
+  body('words.*.word_translation_uk')
+    .trim()
+    .isString()
+    .withMessage('Переклад слова має бути рядком')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Переклад слова має містити від 1 до 255 символів'),
+  body('words.*.sentence_text')
+    .trim()
+    .isString()
+    .withMessage('Речення має бути рядком')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Речення має містити від 1 до 255 символів'),
+  body('words.*.sentence_translation_uk')
+    .trim()
+    .isString()
+    .withMessage('Переклад речення має бути рядком')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Переклад речення має містити від 1 до 255 символів'),
+];
+
 module.exports = {
   registerValidation,
   loginValidation,
@@ -138,4 +168,5 @@ module.exports = {
   wordValidation,
   feedbackValidation,
   feedbackUpdateValidation,
+  bulkWordsValidation,
 };

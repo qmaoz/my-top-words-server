@@ -3,6 +3,12 @@ const { validationResult } = require('express-validator');
 
 const { WordSet, User, Word } = require('../models/models');
 const { consoleError } = require('../utils');
+const {
+  canAccessWordSet,
+  buildPublicListingCondition,
+  normalizeVisibility,
+  VISIBILITY_LEVELS,
+} = require('../utils/wordSetVisibility');
 
 const literalPopularity = '(SELECT COUNT(*) FROM users__word_sets AS uws WHERE uws.word_set_id = "word-sets".id)';
 const literalTotalWords = '(SELECT COUNT(*) FROM words__word_sets AS wws WHERE wws.word_set_id = "word-sets".id)';
@@ -62,44 +68,27 @@ async function getAll(req, res) {
 
     let whereConditions = {};
 
-    /*
-    [Sequelize.Op.or]: {
-      owner_user_id: [learnerId, null],
-      is_public: true
-    }
-
-    [Sequelize.Op.or]: {
-      owner_user_id: learnerId,
-      [Sequelize.Op.or]: {
-        owner_user_id: { [Sequelize.Op.is]: null },
-        is_public: true
-      }
-    }
-    */
-
-
     if (filter === 'own' && isAuth) {
       whereConditions.owner_user_id = learnerId;
     } else if (filter === 'saved' && isAuth) {
       whereConditions[Sequelize.Op.and] = [
         Sequelize.where(Sequelize.literal(literalIsSaved), true),
         {
-          [Sequelize.Op.or]: {
-            owner_user_id: learnerId,
-            [Sequelize.Op.or]: {
-              owner_user_id: { [Sequelize.Op.is]: null },
-              is_public: true
-            }
-          }
+            [Sequelize.Op.or]: [
+              { owner_user_id: learnerId },
+              { owner_user_id: { [Sequelize.Op.is]: null } },
+              { visibility: 'unlisted' },
+              buildPublicListingCondition(Sequelize),
+            ],
         }
       ];
     } else if (filter === 'top') {
       whereConditions[Sequelize.Op.and] = [
         {
-          [Sequelize.Op.or]: {
-            owner_user_id: { [Sequelize.Op.is]: null },
-            is_public: true
-          }
+          [Sequelize.Op.or]: [
+            { owner_user_id: { [Sequelize.Op.is]: null } },
+            buildPublicListingCondition(Sequelize),
+          ],
         },
         Sequelize.where(Sequelize.literal(literalTotalWords), { [Sequelize.Op.gt]: 0 }),
       ];
@@ -181,17 +170,8 @@ async function getOne(req, res) {
     const learnerId = req.userId ?? null;
     const isAuth = learnerId != null;
 
-    let whereConditions = { id: wordSetId };
-    whereConditions[Sequelize.Op.or] = {
-      owner_user_id: learnerId,
-      [Sequelize.Op.or]: {
-        owner_user_id: { [Sequelize.Op.is]: null },
-        is_public: true
-      }
-    };
-
     const wordSet = await WordSet.findOne({
-      where: whereConditions,
+      where: { id: wordSetId },
       attributes: {
         include: [
           ...(isAuth ? [
@@ -226,7 +206,7 @@ async function getOne(req, res) {
       replacements: { learnerId: learnerId ?? null },
     });
 
-    if (!wordSet) {
+    if (!wordSet || !canAccessWordSet(wordSet.get({ plain: true }), learnerId)) {
       return res.status(404).json({
         source: 'Помилка під час отримання набору #1',
         message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
@@ -241,6 +221,8 @@ async function getOne(req, res) {
     if (result.is_public == null) {
       result.is_public = false;
     }
+    result.visibility = normalizeVisibility(result);
+    result.is_public = result.visibility === 'public';
 
     return res.json(result);
   } catch (error) {
@@ -311,7 +293,7 @@ async function remove(req, res) {
 async function update(req, res) {
   try {
     const { wordSetId } = req.params;
-    const { name , setIsPublic } = req.body;
+    const { name, visibility, setIsPublic } = req.body;
     const errors = validationResult(req);
 
     const wordSet = await WordSet.findOne({
@@ -335,7 +317,21 @@ async function update(req, res) {
     
     const updateData = {};
     if (name != null) updateData.name = name;
-    if (setIsPublic != null) updateData.is_public = setIsPublic;
+
+    let nextVisibility = visibility;
+    if (nextVisibility == null && setIsPublic != null) {
+      nextVisibility = setIsPublic ? 'public' : 'private';
+    }
+    if (nextVisibility != null) {
+      if (!VISIBILITY_LEVELS.includes(nextVisibility)) {
+        return res.status(400).json({
+          source: 'Помилка під час оновлення набору',
+          message: 'Некоректний рівень доступу до набору',
+        });
+      }
+      updateData.visibility = nextVisibility;
+      updateData.is_public = nextVisibility === 'public';
+    }
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
@@ -355,7 +351,10 @@ async function update(req, res) {
       });
     }
 
-    res.json(updateData);
+    res.json({
+      ...updateData,
+      visibility: updateData.visibility ?? normalizeVisibility(wordSet),
+    });
   } catch (error) {
     consoleError('Помилка під час оновлення набору: ' + error.message);
     res.status(500).json({
