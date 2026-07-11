@@ -3,6 +3,8 @@ const { validationResult } = require('express-validator');
 
 const { FeedbackMessage, User } = require('../models/models');
 const { consoleError } = require('../utils');
+const { respondServerError } = require('../utils/apiResponse');
+const { parsePagination } = require('../utils/pagination');
 
 const FEEDBACK_TYPES = ['typo', 'bug', 'suggestion', 'other'];
 const FEEDBACK_STATUSES = ['queued', 'in_progress', 'done'];
@@ -102,19 +104,13 @@ async function create(req, res) {
 
     res.status(201).json({ item: feedback });
   } catch (error) {
-    consoleError('Помилка під час надсилання повідомлення: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час надсилання повідомлення',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час надсилання повідомлення', error);
   }
 }
 
 async function getAll(req, res) {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 10 });
     const { status, search } = req.query;
 
     const where = {};
@@ -154,11 +150,7 @@ async function getAll(req, res) {
       totalItems: count,
     });
   } catch (error) {
-    consoleError('Помилка під час отримання повідомлень: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання повідомлень',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час отримання повідомлень', error);
   }
 }
 
@@ -202,11 +194,7 @@ async function update(req, res) {
 
     res.json({ item: updated });
   } catch (error) {
-    consoleError('Помилка під час оновлення повідомлення: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час оновлення повідомлення',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час оновлення повідомлення', error);
   }
 }
 

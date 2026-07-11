@@ -4,6 +4,8 @@ const { Op } = require('sequelize');
 const { Word, User, WordSet } = require('../models/models');
 const { consoleError } = require('../utils');
 const { buildWordEntryKey } = require('../utils/wordEntries');
+const { respondServerError } = require('../utils/apiResponse');
+const { parsePagination } = require('../utils/pagination');
 
 async function verifyWordAuthor(req, res, next) {
   try {
@@ -33,11 +35,7 @@ async function verifyWordAuthor(req, res, next) {
 
     next();
   } catch (error) {
-    consoleError('Помилка під час перевірки автора слова: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час перевірки автора слова',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час перевірки автора слова', error);
   }
 }
 
@@ -45,9 +43,7 @@ async function getAll(req, res) {
   try {
     const learnerId = req.userId ?? null;
     const isAuth = learnerId != null;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 12;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 12 });
 
     const { filter } = req.query; // now only "own" filter is possible
 
@@ -98,11 +94,7 @@ async function getAll(req, res) {
       totalItems: count
     });
   } catch (error) {
-    consoleError('Помилка під час отримання слів: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання слів',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час отримання слів', error);
   }
 }
 
@@ -124,11 +116,7 @@ async function create(req, res) {
     const newWord = await Word.create({ owner_user_id, word_text, word_translation_uk, sentence_text, sentence_translation_uk });
     return res.json(newWord);
   } catch (error) {
-    consoleError('Помилка під час додавання нового слова: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час додавання нового слова',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час додавання нового слова', error);
   }
 }
 
@@ -144,11 +132,7 @@ async function remove(req, res) {
 
     res.json({ id: wordId });
   } catch (error) {
-    consoleError('Помилка під час видалення слова: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час видалення слова',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час видалення слова', error);
   }
 }
 
@@ -244,11 +228,7 @@ async function update(req, res) {
       });
     }
   } catch (error) {
-    consoleError('Помилка під час оновлення слова: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час оновлення слова',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час оновлення слова', error);
   }
 }
 

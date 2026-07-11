@@ -4,7 +4,8 @@ const {
   User, Word, WordSet, FeedbackMessage,
 } = require('../models/models');
 const { consoleError } = require('../utils');
-const { ADMIN_USER_ID } = require('../middleware/admin');
+const { respondServerError } = require('../utils/apiResponse');
+const { parsePagination } = require('../utils/pagination');
 
 async function getOverview(req, res) {
   try {
@@ -26,19 +27,13 @@ async function getOverview(req, res) {
       feedbackDone,
     });
   } catch (error) {
-    consoleError('Помилка під час отримання огляду адміна: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання огляду адміна',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час отримання огляду адміна', error);
   }
 }
 
 async function getUsers(req, res) {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 10 });
     const { search } = req.query;
 
     const where = {};
@@ -49,7 +44,7 @@ async function getUsers(req, res) {
 
     const { count, rows } = await User.findAndCountAll({
       where,
-      attributes: ['id', 'username'],
+      attributes: ['id', 'username', 'is_admin'],
       order: [['id', 'ASC']],
       limit,
       offset,
@@ -62,11 +57,7 @@ async function getUsers(req, res) {
       totalItems: count,
     });
   } catch (error) {
-    consoleError('Помилка під час отримання користувачів: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання користувачів',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час отримання користувачів', error);
   }
 }
 
@@ -88,13 +79,6 @@ async function deleteUser(req, res) {
       });
     }
 
-    if (targetId === ADMIN_USER_ID) {
-      return res.status(400).json({
-        source: 'Помилка під час видалення користувача',
-        message: 'Не можна видалити обліковий запис адміністратора',
-      });
-    }
-
     const user = await User.findByPk(targetId);
 
     if (!user) {
@@ -104,15 +88,18 @@ async function deleteUser(req, res) {
       });
     }
 
+    if (user.is_admin) {
+      return res.status(400).json({
+        source: 'Помилка під час видалення користувача',
+        message: 'Не можна видалити обліковий запис адміністратора',
+      });
+    }
+
     await user.destroy();
 
     res.json({ message: 'Користувача видалено' });
   } catch (error) {
-    consoleError('Помилка під час видалення користувача: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час видалення користувача',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час видалення користувача', error);
   }
 }
 

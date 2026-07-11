@@ -3,6 +3,9 @@ const { validationResult } = require('express-validator');
 
 const { WordSet, User, Word } = require('../models/models');
 const { consoleError } = require('../utils');
+const { respondServerError } = require('../utils/apiResponse');
+const { parsePagination } = require('../utils/pagination');
+const { resolveWordSetListFilter, requiresAuthForWordSetListFilter } = require('../utils/wordSetFilters');
 const {
   canAccessWordSet,
   buildPublicListingCondition,
@@ -44,11 +47,7 @@ async function verifyWordSetAuthor(req, res, next) {
 
     next();
   } catch (error) {
-    consoleError('Помилка під час перевірки автора набору: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час перевірки автора набору',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час перевірки автора набору', error);
   }
 }
 
@@ -56,40 +55,39 @@ async function getAll(req, res) {
   try {
     const learnerId = req.userId ?? null;
     const isAuth = learnerId != null;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 12;
-    const { filter, partOfName } = req.query; // possible filters: 'top' / 'saved' / 'own'
+    const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 12 });
+    const { filter, partOfName } = req.query;
 
-    if (!isAuth && (filter == 'own' || filter == 'saved')) {
+    const effectiveFilter = resolveWordSetListFilter(filter);
+
+    if (!isAuth && requiresAuthForWordSetListFilter(effectiveFilter)) {
       throw new Error('Помилка авторизації');
     }
-    
-    const offset = (page - 1) * limit;
 
     let whereConditions = {};
 
-    if (filter === 'own' && isAuth) {
+    if (effectiveFilter === 'own' && isAuth) {
       whereConditions.owner_user_id = learnerId;
-    } else if (filter === 'saved' && isAuth) {
+    } else if (effectiveFilter === 'saved' && isAuth) {
       whereConditions[Sequelize.Op.and] = [
         Sequelize.where(Sequelize.literal(literalIsSaved), true),
         {
             [Sequelize.Op.or]: [
               { owner_user_id: learnerId },
-              { owner_user_id: { [Sequelize.Op.is]: null } },
+              {
+                [Sequelize.Op.and]: [
+                  { owner_user_id: { [Sequelize.Op.is]: null } },
+                  buildPublicListingCondition(Sequelize),
+                ],
+              },
               { visibility: 'unlisted' },
               buildPublicListingCondition(Sequelize),
             ],
         }
       ];
-    } else if (filter === 'top') {
+    } else if (effectiveFilter === 'top') {
       whereConditions[Sequelize.Op.and] = [
-        {
-          [Sequelize.Op.or]: [
-            { owner_user_id: { [Sequelize.Op.is]: null } },
-            buildPublicListingCondition(Sequelize),
-          ],
-        },
+        buildPublicListingCondition(Sequelize),
         Sequelize.where(Sequelize.literal(literalTotalWords), { [Sequelize.Op.gt]: 0 }),
       ];
     }
@@ -112,7 +110,7 @@ async function getAll(req, res) {
       [Sequelize.cast(Sequelize.literal(literalTotalWords), 'INTEGER'), 'totalWords']
     ];
 
-    if (filter !== 'own') {
+    if (effectiveFilter !== 'own') {
       attributesInclude.push([Sequelize.cast(Sequelize.literal(literalPopularity), 'INTEGER'), 'popularity']);
     }
 
@@ -125,7 +123,7 @@ async function getAll(req, res) {
 
     let orderCondition;
 
-    if (filter === 'own' && isAuth) {
+    if (effectiveFilter === 'own' && isAuth) {
       orderCondition = [['id', 'DESC']];
     } else {
       orderCondition = [[Sequelize.literal(literalPopularity), 'DESC']];
@@ -156,11 +154,7 @@ async function getAll(req, res) {
       totalItems: count
     });
   } catch (error) {
-    consoleError('Помилка під час отримання наборів слів: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання наборів слів',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час отримання наборів слів', error);
   }
 }
 
@@ -226,11 +220,7 @@ async function getOne(req, res) {
 
     return res.json(result);
   } catch (error) {
-    consoleError('Помилка під час отримання набору #2: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання набору #2',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час отримання набору #2', error);
   }
 }
 
@@ -254,17 +244,16 @@ async function create(req, res) {
       name: name
     }});
     if (sameWordSetWithSameOwner) {
-      throw new Error('Ви вже маєте набір з тією самою назвою');
+      return res.status(400).json({
+        source: 'Помилка під час створення набору',
+        message: 'Ви вже маєте набір з тією самою назвою',
+      });
     }
     
     const newWordSet = await WordSet.create({ name, owner_user_id });
     return res.json(newWordSet);
   } catch (error) {
-    consoleError('Помилка під час створення набору: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час створення набору',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час створення набору', error);
   }
 }
 
@@ -282,11 +271,7 @@ async function remove(req, res) {
       success: true
     });
   } catch (error) {
-    consoleError('Помилка під час видалення набору: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час видалення набору',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час видалення набору', error);
   }
 }
 
@@ -356,11 +341,7 @@ async function update(req, res) {
       visibility: updateData.visibility ?? normalizeVisibility(wordSet),
     });
   } catch (error) {
-    consoleError('Помилка під час оновлення набору: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час оновлення набору',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час оновлення набору', error);
   }
 }
 

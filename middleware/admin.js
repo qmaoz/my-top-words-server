@@ -1,14 +1,23 @@
-const ADMIN_USER_ID = parseInt(process.env.ADMIN_USER_ID || '1', 10);
+const { User } = require('../models/models');
 
-function verifyAdmin(req, res, next) {
-  if (req.userId !== ADMIN_USER_ID) {
-    return res.status(403).json({
-      source: 'Помилка доступу',
-      message: 'Доступ заборонено',
+async function verifyAdmin(req, res, next) {
+  try {
+    const user = await User.findByPk(req.userId, {
+      attributes: ['id', 'is_admin'],
     });
-  }
 
-  next();
+    if (!user?.is_admin) {
+      return res.status(403).json({
+        source: 'Помилка доступу',
+        message: 'Доступ заборонено',
+      });
+    }
+
+    next();
+  } catch (error) {
+    const { respondServerError } = require('../utils/apiResponse');
+    return respondServerError(res, 'Помилка перевірки прав адміністратора', error);
+  }
 }
 
-module.exports = { verifyAdmin, ADMIN_USER_ID };
+module.exports = { verifyAdmin };

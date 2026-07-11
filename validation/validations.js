@@ -115,7 +115,9 @@ const feedbackValidation = [
     .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 500 })
-    .withMessage('Адреса сторінки занадто довга'),
+    .withMessage('Адреса сторінки занадто довга')
+    .matches(/^\/[a-zA-Z0-9/_-]*$/)
+    .withMessage('Дозволено лише внутрішній шлях, наприклад /about'),
 ];
 
 const feedbackUpdateValidation = [

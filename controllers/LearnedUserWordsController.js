@@ -1,16 +1,24 @@
 const { LearnedUserWords, Word } = require('../models/models');
-const { consoleError } = require('../utils');
+const { respondServerError } = require('../utils/apiResponse');
+const { canUserAccessWord } = require('../utils/wordAccess');
 
 async function toggleLearned(req, res) {
   try {
     const { wordId } = req.params;
     const userId = req.userId;
 
-    const word = await Word.findByPk(wordId);
+    const { allowed, word } = await canUserAccessWord(wordId, userId);
     if (!word) {
       return res.status(404).json({
         source: 'Помилка при зміні статусу слова',
         message: `Слово #${wordId} не знайдено`
+      });
+    }
+
+    if (!allowed) {
+      return res.status(403).json({
+        source: 'Помилка при зміні статусу слова',
+        message: 'Доступ до цього слова заборонено',
       });
     }
 
@@ -37,11 +45,7 @@ async function toggleLearned(req, res) {
       isLearned: nextStatus
     });
   } catch (error) {
-    consoleError('Помилка при зміні статусу слова: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка при зміні статусу слова',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка при зміні статусу слова', error);
   }
 }
 

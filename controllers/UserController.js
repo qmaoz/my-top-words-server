@@ -1,14 +1,15 @@
-const { validationResult } = require('express-validator'); 
+const { validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const { User } = require('../models/models');
 const { consoleError } = require('../utils');
+const { respondServerError, respondAuthTokenError } = require('../utils/apiResponse');
 
 async function register(req, res) {
   try {
     const errors = validationResult(req);
-    
+
     if (!errors.isEmpty()) {
       consoleError('Помилка під час реєстрації користувача:', errors.array()[0].msg);
       return res.status(400).json({
@@ -16,7 +17,7 @@ async function register(req, res) {
         message: errors.array()[0].msg
       });
     }
-    
+
     const { username, password } = req.body;
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -26,7 +27,6 @@ async function register(req, res) {
       password: passwordHash
     });
 
-    // generate a JWT to keep the user logged in immediately after registration
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET_KEY, {
       expiresIn: '24h'
     });
@@ -40,16 +40,21 @@ async function register(req, res) {
       token
     });
   } catch (error) {
-    consoleError('Помилка під час реєстрації користувача: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час реєстрації користувача',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час реєстрації користувача', error);
   }
 }
 
 async function login(req, res) {
   try {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        source: 'Помилка під час авторизації',
+        message: errors.array()[0].msg
+      });
+    }
+
     const { username, password } = req.body;
     const user = await User.findOne({ where: { username } });
     if (!user) {
@@ -71,16 +76,12 @@ async function login(req, res) {
       expiresIn: '24h'
     });
 
-    const {...userData } = user['dataValues'];
+    const { ...userData } = user['dataValues'];
     delete userData.password;
 
     res.json({ userData, token });
   } catch (error) {
-    consoleError('Помилка під час авторизації: ', error.message);
-    res.status(500).json({
-      source: 'Помилка під час авторизації',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час авторизації', error);
   }
 }
 
@@ -94,20 +95,16 @@ async function userinfo(req, res) {
       });
     }
 
-    const {...userData } = user['dataValues'];
+    const { ...userData } = user['dataValues'];
     delete userData.password;
 
     res.json({ userData });
   } catch (error) {
-    consoleError('Помилка під час отримання даних користувача: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання даних користувача',
-      message: error.message
-    });
+    return respondServerError(res, 'Помилка під час отримання даних користувача', error);
   }
 }
 
-function verifyToken (req, res, next) {
+function verifyToken(req, res, next) {
   const token = req.header('Authorization');
 
   if (!token) {
@@ -118,25 +115,21 @@ function verifyToken (req, res, next) {
   }
 
   try {
-    // extract the token from the "Bearer <token>" string format
     const decoded = jwt.verify(
       token.split(' ')[1],
-      process.env.JWT_SECRET_KEY
+      process.env.JWT_SECRET_KEY,
+      { algorithms: ['HS256'] }
     );
-    
-    // pass the decoded user ID to the next middleware/controller
+
     req.userId = decoded.userId;
     next();
   } catch (error) {
     consoleError('Помилка під час перевірки токена: ' + error.message);
-    res.status(401).json({
-      source: 'Помилка під час перевірки токена',
-      message: error.message
-    });
+    return respondAuthTokenError(res);
   }
 }
 
-function verifyTokenOptional (req, res, next) {
+function verifyTokenOptional(req, res, next) {
   const token = req.header('Authorization');
 
   if (!token) {
@@ -144,13 +137,12 @@ function verifyTokenOptional (req, res, next) {
   }
 
   try {
-    // extract the token from the "Bearer <token>" string format
     const decoded = jwt.verify(
       token.split(' ')[1],
-      process.env.JWT_SECRET_KEY
+      process.env.JWT_SECRET_KEY,
+      { algorithms: ['HS256'] }
     );
 
-    // pass the decoded user ID to the next middleware/controller
     req.userId = decoded.userId;
     next();
   } catch (error) {

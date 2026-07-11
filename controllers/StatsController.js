@@ -1,5 +1,5 @@
 const { User, Word, WordSet } = require('../models/models');
-const { consoleError } = require('../utils');
+const { respondServerError } = require('../utils/apiResponse');
 
 async function getPublic(req, res) {
   try {
@@ -15,11 +15,7 @@ async function getPublic(req, res) {
       wordSetsCount,
     });
   } catch (error) {
-    consoleError('Помилка під час отримання статистики: ' + error.message);
-    res.status(500).json({
-      source: 'Помилка під час отримання статистики',
-      message: error.message,
-    });
+    return respondServerError(res, 'Помилка під час отримання статистики', error);
   }
 }
 
