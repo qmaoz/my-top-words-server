@@ -13,7 +13,7 @@ describe('apiResponse', () => {
 
   it('у production ховає деталі помилки', () => {
     process.env.NODE_ENV = 'production';
-    expect(serverErrorMessage(new Error('sequelize timeout'))).toBe('Внутрішня помилка сервера');
+    expect(serverErrorMessage(new Error('sequelize timeout'))).toBe('Internal server error');
   });
 
   it('у development показує message', () => {
@@ -27,12 +27,12 @@ describe('apiResponse', () => {
     const status = vi.fn(() => ({ json }));
     const res = { status };
 
-    respondServerError(res, 'Тест', new Error('secret'));
+    respondServerError(res, 'Test', new Error('secret'));
 
     expect(status).toHaveBeenCalledWith(500);
     expect(json).toHaveBeenCalledWith({
-      source: 'Тест',
-      message: 'Внутрішня помилка сервера',
+      source: 'Test',
+      message: 'Internal server error',
     });
   });
 
@@ -45,8 +45,8 @@ describe('apiResponse', () => {
 
     expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith({
-      source: 'Помилка під час перевірки токена',
-      message: 'Недійсний або прострочений токен',
+      source: 'Token verification error',
+      message: 'Invalid or expired token',
     });
   });
 });

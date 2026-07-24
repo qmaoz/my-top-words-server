@@ -51,7 +51,7 @@ describe('validations', () => {
         .send({ type: 'bug', message: 'test', page_url: 'https://evil.com' });
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toMatch(/внутрішній шлях/i);
+      expect(res.body.message).toMatch(/internal path/i);
     });
 
     it('приймає внутрішній шлях', async () => {
@@ -82,7 +82,7 @@ describe('validations', () => {
         body('confirm_password')
           .trim()
           .custom((value, { req }) => value === req.body.password)
-          .withMessage('Паролі не збігаються!'),
+          .withMessage('Passwords do not match'),
       ];
       const app = buildValidationApp(confirmRules);
 
@@ -91,7 +91,7 @@ describe('validations', () => {
         .send({ password: 'SecretPass1!@#', confirm_password: 'OtherPass1!@#' });
 
       expect(mismatch.status).toBe(400);
-      expect(mismatch.body.message).toMatch(/не збігаються/i);
+      expect(mismatch.body.message).toMatch(/do not match/i);
 
       const match = await request(app)
         .post('/test')

@@ -26,7 +26,6 @@ describe('wordSetVisibility', () => {
     const privateSet = { owner_user_id: 5, visibility: 'private' };
     const publicSet = { owner_user_id: 5, visibility: 'public' };
     const unlistedSet = { owner_user_id: 5, visibility: 'unlisted' };
-    const systemSet = { owner_user_id: null, visibility: 'private' };
 
     it('власник бачить свій private набір', () => {
       expect(canAccessWordSet(privateSet, 5)).toBe(true);
@@ -40,11 +39,6 @@ describe('wordSetVisibility', () => {
     it('public і unlisted доступні без авторизації', () => {
       expect(canAccessWordSet(publicSet, null)).toBe(true);
       expect(canAccessWordSet(unlistedSet, null)).toBe(true);
-    });
-
-    it('системний набір (owner null) доступний усім', () => {
-      expect(canAccessWordSet(systemSet, null)).toBe(true);
-      expect(canAccessWordSet(systemSet, 1)).toBe(true);
     });
   });
 

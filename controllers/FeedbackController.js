@@ -47,8 +47,8 @@ async function assertFeedbackRateLimit(req, res) {
 
     if (recentCount >= FEEDBACK_RATE_LIMIT_AUTH) {
       res.status(429).json({
-        source: 'Помилка під час надсилання повідомлення',
-        message: 'Забагато повідомлень за годину. Спробуйте пізніше.',
+        source: 'Failed to send feedback',
+        message: 'Too many messages this hour. Please try again later.',
       });
       return false;
     }
@@ -68,8 +68,8 @@ async function assertFeedbackRateLimit(req, res) {
 
   if (entry.count >= FEEDBACK_RATE_LIMIT_GUEST) {
     res.status(429).json({
-      source: 'Помилка під час надсилання повідомлення',
-      message: 'Забагато повідомлень за годину. Спробуйте пізніше.',
+      source: 'Failed to send feedback',
+      message: 'Too many messages this hour. Please try again later.',
     });
     return false;
   }
@@ -84,7 +84,7 @@ async function create(req, res) {
 
     if (!errors.isEmpty()) {
       return res.status(400).json({
-        source: 'Помилка під час надсилання повідомлення',
+        source: 'Failed to send feedback',
         message: errors.array()[0].msg,
       });
     }
@@ -104,7 +104,7 @@ async function create(req, res) {
 
     res.status(201).json({ item: feedback });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час надсилання повідомлення', error);
+    return respondServerError(res, 'Failed to send feedback', error);
   }
 }
 
@@ -150,7 +150,7 @@ async function getAll(req, res) {
       totalItems: count,
     });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час отримання повідомлень', error);
+    return respondServerError(res, 'Failed to load feedback', error);
   }
 }
 
@@ -160,7 +160,7 @@ async function update(req, res) {
 
     if (!errors.isEmpty()) {
       return res.status(400).json({
-        source: 'Помилка під час оновлення повідомлення',
+        source: 'Failed to update feedback',
         message: errors.array()[0].msg,
       });
     }
@@ -170,8 +170,8 @@ async function update(req, res) {
 
     if (!feedback) {
       return res.status(404).json({
-        source: 'Помилка під час оновлення повідомлення',
-        message: `Повідомлення #${id} не знайдено`,
+        source: 'Failed to update feedback',
+        message: `Message #${id} not found`,
       });
     }
 
@@ -194,7 +194,7 @@ async function update(req, res) {
 
     res.json({ item: updated });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час оновлення повідомлення', error);
+    return respondServerError(res, 'Failed to update feedback', error);
   }
 }
 

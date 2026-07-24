@@ -10,8 +10,8 @@ async function toggleSaving(req, res) {
     const wordSet = await WordSet.findByPk(wordSetId);
     if (!wordSet || !canAccessWordSet(wordSet.get({ plain: true }), userId)) {
       return res.status(404).json({
-        source: 'Помилка при зміні статусу набору',
-        message: 'Набір не знайдено або доступ до нього заборонено',
+        source: 'Failed to change set status',
+        message: 'Set not found or access is denied',
       });
     }
 
@@ -38,7 +38,7 @@ async function toggleSaving(req, res) {
       isSavedForLearning: nextStatus
     });
   } catch (error) {
-    return respondServerError(res, 'Помилка при зміні статусу набору', error);
+    return respondServerError(res, 'Failed to change set status', error);
   }
 }
 

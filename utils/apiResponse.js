@@ -1,7 +1,7 @@
 const { consoleError } = require('../utils');
 
-const GENERIC_SERVER_ERROR = 'Внутрішня помилка сервера';
-const GENERIC_AUTH_ERROR = 'Недійсний або прострочений токен';
+const GENERIC_SERVER_ERROR = 'Internal server error';
+const GENERIC_AUTH_ERROR = 'Invalid or expired token';
 
 function isProduction() {
   return process.env.NODE_ENV === 'production';
@@ -21,7 +21,7 @@ function respondServerError(res, source, error, status = 500) {
 
 function respondAuthTokenError(res) {
   return res.status(401).json({
-    source: 'Помилка під час перевірки токена',
+    source: 'Token verification error',
     message: GENERIC_AUTH_ERROR,
   });
 }

@@ -15,7 +15,7 @@ async function getPublic(req, res) {
       wordSetsCount,
     });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час отримання статистики', error);
+    return respondServerError(res, 'Failed to load stats', error);
   }
 }
 

@@ -6,8 +6,8 @@ const authRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    source: 'Помилка авторизації',
-    message: 'Забагато спроб. Спробуйте пізніше.',
+    source: 'Authentication error',
+    message: 'Too many attempts. Please try again later.',
   },
 });
 

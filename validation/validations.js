@@ -1,16 +1,62 @@
 const { body } = require('express-validator');
 const { User } = require('../models/models');
+const { isSupportedLocale } = require('../utils/locales');
+
+const MAX_FIELD_LENGTH = 255;
+
+// Validates a translations map: { [locale]: { word_translation, sentence_translation } }.
+// Requires at least one supported locale with both fields filled and within length limits.
+function validateTranslationsMap(translations) {
+  if (!translations || typeof translations !== 'object' || Array.isArray(translations)) {
+    throw new Error('Translations must be an object keyed by locale');
+  }
+
+  const entries = Object.entries(translations);
+  if (entries.length === 0) {
+    throw new Error('At least one translation is required');
+  }
+
+  let filledCount = 0;
+
+  for (const [locale, value] of entries) {
+    if (!isSupportedLocale(locale)) {
+      throw new Error(`Unsupported translation locale: ${locale}`);
+    }
+    if (!value || typeof value !== 'object') {
+      throw new Error(`Translation for "${locale}" must be an object`);
+    }
+
+    const wordTranslation = String(value.word_translation ?? '').trim();
+    const sentenceTranslation = String(value.sentence_translation ?? '').trim();
+
+    if (wordTranslation === '' && sentenceTranslation === '') {
+      continue;
+    }
+
+    if (wordTranslation.length > MAX_FIELD_LENGTH || sentenceTranslation.length > MAX_FIELD_LENGTH) {
+      throw new Error(`Translation for "${locale}" is too long (max ${MAX_FIELD_LENGTH})`);
+    }
+
+    filledCount += 1;
+  }
+
+  if (filledCount === 0) {
+    throw new Error('At least one filled translation is required');
+  }
+
+  return true;
+}
 
 const messages = {
-  'incorrect username length': 'Ім\'я користувача має містити від 1 до 20 символів',
-  'username already taken': 'Це ім\'я користувача вже використовується',
+  'incorrect username length': 'Username must be 1–20 characters',
+  'username already taken': 'This username is already taken',
 
-  'incorrect password length': 'Пароль має містити від 12 до 20 символів',
-  'minimum one small letter in password': 'Пароль має містити принаймні одну малу літеру!',
-  'minimum one big letter in password': 'Пароль має містити принаймні одну велику літеру!',
-  'minimum one digit in password': 'Пароль має містити принаймні одну цифру!',
-  'minimum one special character in password': 'Пароль має містити принаймні один спецсимвол (!@#$%^&*()_=+\/\\~`\'\"-)!',
-  'the passwords do not match': 'Паролі не збігаються!',
+  'incorrect password length': 'Password must be 12–20 characters',
+  'minimum one small letter in password': 'Password must contain at least one lowercase letter',
+  'minimum one big letter in password': 'Password must contain at least one uppercase letter',
+  'minimum one digit in password': 'Password must contain at least one digit',
+  'minimum one special character in password': 'Password must contain at least one special character (!@#$%^&*()_=+/\\~`\'"-)',
+  'the passwords do not match': 'Passwords do not match',
 };
 
 const registerValidation = [
@@ -54,7 +100,7 @@ const loginValidation = [
   body('password')
     .trim()
     .notEmpty()
-    .withMessage('Пароль не може бути порожнім'),
+    .withMessage('Password cannot be empty'),
 ];
 
 const wordSetValidation = [
@@ -62,41 +108,51 @@ const wordSetValidation = [
     .optional()
     .trim()
     .isString()
-    .withMessage('Ім\'я набору має бути рядком!')
+    .withMessage('Set name must be a string')
     .isLength({ min: 1, max: 30 })
-    .withMessage('Назва набору повинна містити від 1 до 30 символів!'),
+    .withMessage('Set name must be 1–30 characters'),
   body('visibility')
     .optional()
     .trim()
     .isIn(['private', 'unlisted', 'public'])
-    .withMessage('Некоректний рівень доступу до набору'),
+    .withMessage('Invalid set visibility'),
+  body('source_locale')
+    .optional()
+    .custom((value) => {
+      if (!isSupportedLocale(value)) {
+        throw new Error('Unsupported set language');
+      }
+      return true;
+    }),
+  body('translation_locales')
+    .optional()
+    .isArray()
+    .withMessage('Translation locales must be an array')
+    .custom((value) => {
+      for (const code of value) {
+        if (!isSupportedLocale(code)) {
+          throw new Error(`Unsupported translation locale: ${code}`);
+        }
+      }
+      return true;
+    }),
 ];
 
 const wordValidation = [
   body('word_text')
     .trim()
     .isString()
-    .withMessage('Слово має бути рядком!')
+    .withMessage('Word must be a string')
     .isLength({ min: 1, max: 255 })
-    .withMessage('Слово має містити від 1 до 255 символів!'),
-  body('word_translation_uk')
-    .trim()
-    .isString()
-    .withMessage('Переклад слова має бути рядком!')
-    .isLength({ min: 1, max: 255 })
-    .withMessage('Переклад слова має містити від 1 до 255 символів!'),
+    .withMessage('Word must be 1–255 characters'),
   body('sentence_text')
     .trim()
     .isString()
-    .withMessage('Речення має бути рядком!')
+    .withMessage('Sentence must be a string')
     .isLength({ min: 1, max: 255 })
-    .withMessage('Речення має містити від 1 до 255 символів!'),
-  body('sentence_translation_uk')
-    .trim()
-    .isString()
-    .withMessage('Переклад речення має бути рядком!')
-    .isLength({ min: 1, max: 255 })
-    .withMessage('Переклад речення повинен містити щонайменше 1 символ!')
+    .withMessage('Sentence must be 1–255 characters'),
+  body('translations')
+    .custom(validateTranslationsMap),
 ];
 
 const FEEDBACK_TYPES = ['typo', 'bug', 'suggestion', 'other'];
@@ -106,18 +162,18 @@ const feedbackValidation = [
   body('type')
     .trim()
     .isIn(FEEDBACK_TYPES)
-    .withMessage('Некоректний тип повідомлення'),
+    .withMessage('Invalid message type'),
   body('message')
     .trim()
     .isLength({ min: 1, max: 2000 })
-    .withMessage('Текст повідомлення має містити від 1 до 2000 символів'),
+    .withMessage('Message text must be 1–2000 characters'),
   body('page_url')
     .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 500 })
-    .withMessage('Адреса сторінки занадто довга')
+    .withMessage('Page path is too long')
     .matches(/^\/[a-zA-Z0-9/_-]*$/)
-    .withMessage('Дозволено лише внутрішній шлях, наприклад /about'),
+    .withMessage('Only an internal path is allowed, e.g. /about'),
 ];
 
 const feedbackUpdateValidation = [
@@ -125,42 +181,82 @@ const feedbackUpdateValidation = [
     .optional()
     .trim()
     .isIn(FEEDBACK_STATUSES)
-    .withMessage('Некоректний статус'),
+    .withMessage('Invalid status'),
   body('admin_note')
     .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 2000 })
-    .withMessage('Примітка адміністратора занадто довга'),
+    .withMessage('Admin note is too long'),
+];
+
+const wordSetRemarkValidation = [
+  body('selected_text')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Selected text is too long'),
+  body('comment')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Comment is too long'),
+  body('word_id')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('Invalid word id'),
+];
+
+const wordSetRemarkUpdateValidation = [
+  body('status')
+    .optional()
+    .trim()
+    .isIn(['queued', 'done'])
+    .withMessage('Invalid status'),
+  body('owner_note')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Note is too long'),
 ];
 
 const bulkWordsValidation = [
   body('words')
     .isArray({ min: 1, max: 100 })
-    .withMessage('Потрібен масив від 1 до 100 слів'),
+    .withMessage('An array of 1–100 words is required'),
   body('words.*.word_text')
     .trim()
     .isString()
-    .withMessage('Слово має бути рядком')
+    .withMessage('Word must be a string')
     .isLength({ min: 1, max: 255 })
-    .withMessage('Слово має містити від 1 до 255 символів'),
-  body('words.*.word_translation_uk')
-    .trim()
-    .isString()
-    .withMessage('Переклад слова має бути рядком')
-    .isLength({ min: 1, max: 255 })
-    .withMessage('Переклад слова має містити від 1 до 255 символів'),
+    .withMessage('Word must be 1–255 characters'),
   body('words.*.sentence_text')
     .trim()
     .isString()
-    .withMessage('Речення має бути рядком')
+    .withMessage('Sentence must be a string')
     .isLength({ min: 1, max: 255 })
-    .withMessage('Речення має містити від 1 до 255 символів'),
-  body('words.*.sentence_translation_uk')
+    .withMessage('Sentence must be 1–255 characters'),
+  body('words.*.translations')
+    .custom(validateTranslationsMap),
+];
+
+const syncWordsValidation = [
+  body('words')
+    .isArray({ max: 2000 })
+    .withMessage('An array of up to 2000 words is required'),
+  body('words.*.word_text')
     .trim()
     .isString()
-    .withMessage('Переклад речення має бути рядком')
+    .withMessage('Word must be a string')
     .isLength({ min: 1, max: 255 })
-    .withMessage('Переклад речення має містити від 1 до 255 символів'),
+    .withMessage('Word must be 1–255 characters'),
+  body('words.*.sentence_text')
+    .trim()
+    .isString()
+    .withMessage('Sentence must be a string')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Sentence must be 1–255 characters'),
+  body('words.*.translations')
+    .custom(validateTranslationsMap),
 ];
 
 module.exports = {
@@ -171,4 +267,7 @@ module.exports = {
   feedbackValidation,
   feedbackUpdateValidation,
   bulkWordsValidation,
+  syncWordsValidation,
+  wordSetRemarkValidation,
+  wordSetRemarkUpdateValidation,
 };

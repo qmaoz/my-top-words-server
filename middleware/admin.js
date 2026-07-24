@@ -8,15 +8,15 @@ async function verifyAdmin(req, res, next) {
 
     if (!user?.is_admin) {
       return res.status(403).json({
-        source: 'Помилка доступу',
-        message: 'Доступ заборонено',
+        source: 'Access error',
+        message: 'Access denied',
       });
     }
 
     next();
   } catch (error) {
     const { respondServerError } = require('../utils/apiResponse');
-    return respondServerError(res, 'Помилка перевірки прав адміністратора', error);
+    return respondServerError(res, 'Admin permission check failed', error);
   }
 }
 

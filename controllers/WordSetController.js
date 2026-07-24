@@ -1,11 +1,13 @@
 const { Sequelize } = require('sequelize');
 const { validationResult } = require('express-validator');
 
-const { WordSet, User, Word } = require('../models/models');
+const { WordSet, User, Word, WordTranslation, WordsWordSets, UserWordProgress } = require('../models/models');
 const { consoleError } = require('../utils');
 const { respondServerError } = require('../utils/apiResponse');
 const { parsePagination } = require('../utils/pagination');
 const { resolveWordSetListFilter, requiresAuthForWordSetListFilter } = require('../utils/wordSetFilters');
+const { serializeWord } = require('../utils/wordSerializer');
+const { normalizeSourceLocale, normalizeTranslationLocales } = require('../utils/locales');
 const {
   canAccessWordSet,
   buildPublicListingCondition,
@@ -25,29 +27,29 @@ async function verifyWordSetAuthor(req, res, next) {
     const userId = req.userId;
     if (userId == null) {
       return res.status(401).json({
-        source: 'Помилка під час перевірки автора набору',
-        message: 'Доступ заборонено'
+        source: 'Set author check failed',
+        message: 'Access denied'
       });
     }
     
     const wordSet = await WordSet.findByPk(wordSetId);
     if (!wordSet) {
       return res.status(404).json({
-        source: 'Помилка під час перевірки автора набору',
-        message: `Набір #${wordSetId} не знайдено`
+        source: 'Set author check failed',
+        message: `Set #${wordSetId} not found`
       });
     }
 
     if (wordSet.owner_user_id != userId) {
       return res.status(401).json({
-        source: 'Помилка під час перевірки автора набору',
-        message: 'Доступ заборонено'
+        source: 'Set author check failed',
+        message: 'Access denied'
       });
     }
 
     next();
   } catch (error) {
-    return respondServerError(res, 'Помилка під час перевірки автора набору', error);
+    return respondServerError(res, 'Set author check failed', error);
   }
 }
 
@@ -61,7 +63,7 @@ async function getAll(req, res) {
     const effectiveFilter = resolveWordSetListFilter(filter);
 
     if (!isAuth && requiresAuthForWordSetListFilter(effectiveFilter)) {
-      throw new Error('Помилка авторизації');
+      throw new Error('Authorization error');
     }
 
     let whereConditions = {};
@@ -74,12 +76,6 @@ async function getAll(req, res) {
         {
             [Sequelize.Op.or]: [
               { owner_user_id: learnerId },
-              {
-                [Sequelize.Op.and]: [
-                  { owner_user_id: { [Sequelize.Op.is]: null } },
-                  buildPublicListingCondition(Sequelize),
-                ],
-              },
               { visibility: 'unlisted' },
               buildPublicListingCondition(Sequelize),
             ],
@@ -154,7 +150,7 @@ async function getAll(req, res) {
       totalItems: count
     });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час отримання наборів слів', error);
+    return respondServerError(res, 'Failed to load word sets', error);
   }
 }
 
@@ -195,6 +191,11 @@ async function getOne(req, res) {
             ] : [])
           ],
           through: { attributes: [] },
+          include: [{
+            model: WordTranslation,
+            as: 'translations',
+            attributes: ['locale', 'word_translation', 'sentence_translation'],
+          }],
         }
       ],
       replacements: { learnerId: learnerId ?? null },
@@ -202,15 +203,40 @@ async function getOne(req, res) {
 
     if (!wordSet || !canAccessWordSet(wordSet.get({ plain: true }), learnerId)) {
       return res.status(404).json({
-        source: 'Помилка під час отримання набору #1',
-        message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
+        source: 'Failed to load word set',
+        message: `Set #${wordSetId} not found or access is denied`
       });
     }
 
     // a minor tweak for front-end convenience
     const result = wordSet.get({ plain: true });
-    result.words = result.wordSetWords;
+    result.words = (result.wordSetWords ?? []).map(serializeWord);
     delete result.wordSetWords;
+
+    if (isAuth && result.words.length > 0) {
+      const progressRows = await UserWordProgress.findAll({
+        where: {
+          user_id: learnerId,
+          word_id: result.words.map((word) => word.id),
+        },
+      });
+      const progressByWordId = new Map(
+        progressRows.map((row) => [Number(row.word_id), row]),
+      );
+
+      result.words = result.words.map((word) => {
+        const progress = progressByWordId.get(Number(word.id));
+        return {
+          ...word,
+          hasProgress: Boolean(progress),
+          nextAt: progress?.next_at ? new Date(progress.next_at).toISOString() : null,
+          reviewStage: progress?.stage ?? 0,
+        };
+      });
+    }
+
+    result.source_locale = normalizeSourceLocale(result.source_locale);
+    result.translation_locales = normalizeTranslationLocales(result.translation_locales);
 
     if (result.is_public == null) {
       result.is_public = false;
@@ -220,7 +246,7 @@ async function getOne(req, res) {
 
     return res.json(result);
   } catch (error) {
-    return respondServerError(res, 'Помилка під час отримання набору #2', error);
+    return respondServerError(res, 'Failed to load word set', error);
   }
 }
 
@@ -229,14 +255,14 @@ async function create(req, res) {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-      consoleError('Помилка під час створення набору: ', errors.array()[0].msg);
+      consoleError('Failed to create word set: ', errors.array()[0].msg);
       return res.status(400).json({
-        source: 'Помилка під час створення набору',
+        source: 'Failed to create word set',
         message: errors.array()[0].msg
       });
     }
 
-    const { name } = req.body;
+    const { name, source_locale, translation_locales } = req.body;
     const owner_user_id = req.userId;
 
     const sameWordSetWithSameOwner = await WordSet.findOne({ where: {
@@ -245,15 +271,25 @@ async function create(req, res) {
     }});
     if (sameWordSetWithSameOwner) {
       return res.status(400).json({
-        source: 'Помилка під час створення набору',
-        message: 'Ви вже маєте набір з тією самою назвою',
+        source: 'Failed to create word set',
+        message: 'You already have a set with this name',
       });
     }
-    
-    const newWordSet = await WordSet.create({ name, owner_user_id });
-    return res.json(newWordSet);
+
+    const newWordSet = await WordSet.create({
+      name,
+      owner_user_id,
+      source_locale: normalizeSourceLocale(source_locale),
+      translation_locales: normalizeTranslationLocales(translation_locales),
+    });
+    const result = newWordSet.get({ plain: true });
+    result.words = [];
+    result.learnedWordsCount = 0;
+    result.source_locale = normalizeSourceLocale(result.source_locale);
+    result.translation_locales = normalizeTranslationLocales(result.translation_locales);
+    return res.status(201).json(result);
   } catch (error) {
-    return respondServerError(res, 'Помилка під час створення набору', error);
+    return respondServerError(res, 'Failed to create word set', error);
   }
 }
 
@@ -271,14 +307,14 @@ async function remove(req, res) {
       success: true
     });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час видалення набору', error);
+    return respondServerError(res, 'Failed to delete word set', error);
   }
 }
 
 async function update(req, res) {
   try {
     const { wordSetId } = req.params;
-    const { name, visibility, setIsPublic } = req.body;
+    const { name, visibility, setIsPublic, source_locale, translation_locales } = req.body;
     const errors = validationResult(req);
 
     const wordSet = await WordSet.findOne({
@@ -287,15 +323,15 @@ async function update(req, res) {
 
     if (!wordSet) {
       return res.status(404).json({
-        source: 'Помилка під час оновлення набору',
-        message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
+        source: 'Failed to update word set',
+        message: `Set #${wordSetId} not found or access is denied`
       });
     }
     
     if (!errors.isEmpty() && name) {
-      consoleError('Помилка під час оновлення набору: ', errors.array()[0].msg);
+      consoleError('Failed to update word set: ', errors.array()[0].msg);
       return res.status(400).json({
-        source: 'Помилка під час оновлення набору',
+        source: 'Failed to update word set',
         message: errors.array()[0].msg
       });
     }
@@ -310,18 +346,30 @@ async function update(req, res) {
     if (nextVisibility != null) {
       if (!VISIBILITY_LEVELS.includes(nextVisibility)) {
         return res.status(400).json({
-          source: 'Помилка під час оновлення набору',
-          message: 'Некоректний рівень доступу до набору',
+          source: 'Failed to update word set',
+          message: 'Invalid set visibility',
         });
       }
       updateData.visibility = nextVisibility;
       updateData.is_public = nextVisibility === 'public';
     }
 
+    if (source_locale != null) {
+      updateData.source_locale = normalizeSourceLocale(source_locale);
+    }
+
+    let removedLocales = [];
+    if (translation_locales != null) {
+      const nextLocales = normalizeTranslationLocales(translation_locales);
+      const prevLocales = normalizeTranslationLocales(wordSet.translation_locales);
+      removedLocales = prevLocales.filter((locale) => !nextLocales.includes(locale));
+      updateData.translation_locales = nextLocales;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
-        source: 'Помилка під час оновлення набору',
-        message: 'Немає даних для оновлення'
+        source: 'Failed to update word set',
+        message: 'Nothing to update'
       });
     }
 
@@ -331,9 +379,26 @@ async function update(req, res) {
 
     if (updatedRowsCount === 0) {    
       return res.status(404).json({
-        source: 'Помилка під час оновлення набору',
-        message: `Набір #${wordSetId} не знайдено або доступ до нього заборонено`
+        source: 'Failed to update word set',
+        message: `Set #${wordSetId} not found or access is denied`
       });
+    }
+
+    // Clean up translations for languages removed from this set.
+    if (removedLocales.length > 0) {
+      const wordLinks = await WordsWordSets.findAll({
+        where: { word_set_id: wordSetId },
+        attributes: ['word_id'],
+      });
+      const wordIds = wordLinks.map((link) => link.word_id);
+      if (wordIds.length > 0) {
+        await WordTranslation.destroy({
+          where: {
+            word_id: { [Sequelize.Op.in]: wordIds },
+            locale: { [Sequelize.Op.in]: removedLocales },
+          },
+        });
+      }
     }
 
     res.json({
@@ -341,7 +406,7 @@ async function update(req, res) {
       visibility: updateData.visibility ?? normalizeVisibility(wordSet),
     });
   } catch (error) {
-    return respondServerError(res, 'Помилка під час оновлення набору', error);
+    return respondServerError(res, 'Failed to update word set', error);
   }
 }
 

@@ -11,7 +11,6 @@ function normalizeVisibility(wordSet) {
 
 function canAccessWordSet(wordSet, userId) {
   if (!wordSet) return false;
-  if (wordSet.owner_user_id == null) return true;
   if (userId != null && Number(wordSet.owner_user_id) === Number(userId)) return true;
 
   const visibility = normalizeVisibility(wordSet);

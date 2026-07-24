@@ -11,6 +11,7 @@ const WordsWordSetsController = require('./controllers/WordsWordSetsController.j
 const LearnedUserWordsController = require('./controllers/LearnedUserWordsController.js');
 const StatsController = require('./controllers/StatsController.js');
 const FeedbackController = require('./controllers/FeedbackController.js');
+const WordSetRemarkController = require('./controllers/WordSetRemarkController.js');
 const AdminController = require('./controllers/AdminController.js');
 const { verifyAdmin } = require('./middleware/admin.js');
 const { authRateLimit } = require('./middleware/rateLimit.js');
@@ -28,15 +29,21 @@ function createApp() {
 
   app.use(helmet());
   app.use(cors({ origin: allowedOrigin }));
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '2mb' }));
 
   app.post('/auth/register', authRateLimit, Validation.registerValidation, UserController.register);
   app.post('/auth/login', authRateLimit, Validation.loginValidation, UserController.login);
   app.get('/userinfo', UserController.verifyToken, UserController.userinfo);
+  app.patch('/user/preferences', UserController.verifyToken, UserController.updatePreferences);
+  app.delete('/user', UserController.verifyToken, UserController.deleteAccount);
 
   app.get('/stats', StatsController.getPublic);
 
   app.post('/feedback', UserController.verifyTokenOptional, Validation.feedbackValidation, FeedbackController.create);
+  app.post('/word-sets/:wordSetId/remarks', UserController.verifyTokenOptional, Validation.wordSetRemarkValidation, WordSetRemarkController.create);
+  app.get('/me/word-set-remarks', UserController.verifyToken, WordSetRemarkController.listForOwnerInbox);
+  app.get('/word-sets/:wordSetId/remarks', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordSetRemarkController.listForWordSet);
+  app.patch('/word-set-remarks/:id', UserController.verifyToken, Validation.wordSetRemarkUpdateValidation, WordSetRemarkController.update);
 
   app.get('/admin/overview', UserController.verifyToken, verifyAdmin, AdminController.getOverview);
   app.get('/admin/feedback', UserController.verifyToken, verifyAdmin, FeedbackController.getAll);
@@ -51,12 +58,14 @@ function createApp() {
   app.patch('/word-sets/toggle-save/:wordSetId', UserController.verifyToken, UsersWordSetsController.toggleSaving);
   app.patch('/word-sets/:wordSetId/words/:wordId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordsWordSetsController.toggleIncludeWordInWordSet);
   app.post('/word-sets/:wordSetId/words/bulk', UserController.verifyToken, WordSetController.verifyWordSetAuthor, Validation.bulkWordsValidation, WordsWordSetsController.bulkImportWords);
+  app.put('/word-sets/:wordSetId/words/sync', UserController.verifyToken, WordSetController.verifyWordSetAuthor, Validation.syncWordsValidation, WordsWordSetsController.syncWordSetWords);
   app.delete('/word-sets/:wordSetId/words', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordsWordSetsController.clearWordSet);
   app.delete('/word-sets/:wordSetId', UserController.verifyToken, WordSetController.verifyWordSetAuthor, WordSetController.remove);
 
   app.post('/words', UserController.verifyToken, Validation.wordValidation, WordController.create);
   app.get('/words', UserController.verifyTokenOptional, WordController.getAll);
   app.patch('/words/toggle-learned/:wordId', UserController.verifyToken, LearnedUserWordsController.toggleLearned);
+  app.patch('/words/:wordId/review', UserController.verifyToken, LearnedUserWordsController.reviewWord);
   app.patch('/words/:wordId', UserController.verifyToken, WordController.verifyWordAuthor, Validation.wordValidation, WordController.update);
   app.delete('/words/:wordId', UserController.verifyToken, WordController.verifyWordAuthor, WordController.remove);
 
