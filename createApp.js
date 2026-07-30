@@ -28,7 +28,11 @@ function createApp() {
     : 'http://localhost:5173';
 
   app.use(helmet());
-  app.use(cors({ origin: allowedOrigin }));
+  app.use(cors({
+    origin: allowedOrigin,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  }));
   app.use(express.json({ limit: '2mb' }));
 
   app.post('/auth/register', authRateLimit, Validation.registerValidation, UserController.register);
