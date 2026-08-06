@@ -6,38 +6,38 @@ const {
 
 describe('locales', () => {
   describe('normalizeSourceLocale', () => {
-    it('повертає підтримувану мову', () => {
+    it('returns a supported locale', () => {
       expect(normalizeSourceLocale('en')).toBe('en');
     });
 
-    it('падає до de для непідтримуваної мови', () => {
+    it('falls back to de for an unsupported locale', () => {
       expect(normalizeSourceLocale('xx')).toBe('de');
       expect(normalizeSourceLocale(null)).toBe('de');
     });
   });
 
   describe('normalizeTranslationLocales', () => {
-    it('прибирає дублікати та зберігає порядок', () => {
+    it('removes duplicates and keeps order', () => {
       expect(normalizeTranslationLocales(['ru', 'uk', 'ru'])).toEqual(['ru', 'uk']);
     });
 
-    it('відкидає непідтримувані мови', () => {
+    it('rejects unsupported locales', () => {
       expect(normalizeTranslationLocales(['uk', 'zz', 'en'])).toEqual(['uk', 'en']);
     });
 
-    it('падає до [uk], якщо список порожній або некоректний', () => {
+    it('falls back to [uk] when the list is empty or invalid', () => {
       expect(normalizeTranslationLocales([])).toEqual(['uk']);
       expect(normalizeTranslationLocales(null)).toEqual(['uk']);
       expect(normalizeTranslationLocales(['zz'])).toEqual(['uk']);
     });
 
-    it('не обмежує кількість мов (дозволяє багато)', () => {
+    it('does not limit the number of locales', () => {
       const many = ['uk', 'ru', 'en', 'pl', 'es', 'fr', 'it', 'ar', 'hi', 'ml', 'tr', 'el', 'zh', 'ku'];
       expect(normalizeTranslationLocales(many)).toEqual(many);
     });
   });
 
-  it('isSupportedLocale працює', () => {
+  it('isSupportedLocale works', () => {
     expect(isSupportedLocale('de')).toBe(true);
     expect(isSupportedLocale('zz')).toBe(false);
   });

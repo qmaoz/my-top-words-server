@@ -24,7 +24,7 @@ function buildTestApp() {
 }
 
 describe('API smoke', () => {
-  it('GET /stats повертає публічну статистику', async () => {
+  it('GET /stats returns public stats', async () => {
     const res = await request(buildTestApp()).get('/stats');
 
     expect(res.status).toBe(200);
@@ -35,12 +35,12 @@ describe('API smoke', () => {
     });
   });
 
-  it('GET /stats має security headers від helmet', async () => {
+  it('GET /stats has helmet security headers', async () => {
     const res = await request(buildTestApp()).get('/stats');
     expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 
-  it('GET /admin/overview без токена повертає 401', async () => {
+  it('GET /admin/overview without a token returns 401', async () => {
     const res = await request(buildTestApp()).get('/admin/overview');
     expect(res.status).toBe(401);
   });

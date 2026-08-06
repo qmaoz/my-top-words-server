@@ -2,25 +2,25 @@ const { buildWordEntryKey, normalizeWordEntry, normalizeTranslationsMap } = requ
 
 describe('wordEntries', () => {
   describe('buildWordEntryKey', () => {
-    it('залежить лише від слова та речення (source)', () => {
+    it('depends only on the source word and sentence', () => {
       const a = { word_text: 'Haus', sentence_text: 'Das Haus ist groß.', translations: { uk: { word_translation: 'дім' } } };
       const b = { word_text: 'Haus', sentence_text: 'Das Haus ist groß.', translations: { uk: { word_translation: 'будинок' } } };
       expect(buildWordEntryKey(a)).toBe(buildWordEntryKey(b));
     });
 
-    it('нормалізує регістр і пробіли', () => {
+    it('normalizes case and whitespace', () => {
       expect(buildWordEntryKey({ word_text: '  Haus ', sentence_text: 'A' }))
         .toBe(buildWordEntryKey({ word_text: 'haus', sentence_text: 'a' }));
     });
 
-    it('розрізняє різні source-пари', () => {
+    it('distinguishes different source pairs', () => {
       expect(buildWordEntryKey({ word_text: 'Haus', sentence_text: 'A' }))
         .not.toBe(buildWordEntryKey({ word_text: 'Haus', sentence_text: 'B' }));
     });
   });
 
   describe('normalizeTranslationsMap', () => {
-    it('відкидає непідтримувані мови та порожні переклади', () => {
+    it('rejects unsupported locales and empty translations', () => {
       const result = normalizeTranslationsMap({
         uk: { word_translation: 'дім', sentence_translation: 'Дім великий.' },
         zz: { word_translation: 'x', sentence_translation: 'y' },
@@ -29,14 +29,14 @@ describe('wordEntries', () => {
       expect(Object.keys(result)).toEqual(['uk']);
     });
 
-    it('повертає порожній об\'єкт для некоректного входу', () => {
+    it('returns an empty object for invalid input', () => {
       expect(normalizeTranslationsMap(null)).toEqual({});
       expect(normalizeTranslationsMap('x')).toEqual({});
     });
   });
 
   describe('normalizeWordEntry', () => {
-    it('нормалізує source та переклади', () => {
+    it('normalizes source and translations', () => {
       const entry = normalizeWordEntry({
         word_text: '  Haus ',
         sentence_text: ' Das Haus. ',

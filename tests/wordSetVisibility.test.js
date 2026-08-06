@@ -8,15 +8,15 @@ const {
 
 describe('wordSetVisibility', () => {
   describe('normalizeVisibility', () => {
-    it('повертає private для null', () => {
+    it('returns private for null', () => {
       expect(normalizeVisibility(null)).toBe('private');
     });
 
-    it('читає visibility, якщо вона валідна', () => {
+    it('reads visibility when it is valid', () => {
       expect(normalizeVisibility({ visibility: 'unlisted' })).toBe('unlisted');
     });
 
-    it('fallback на is_public для legacy записів', () => {
+    it('falls back to is_public for legacy rows', () => {
       expect(normalizeVisibility({ is_public: true })).toBe('public');
       expect(normalizeVisibility({ is_public: false })).toBe('private');
     });
@@ -27,23 +27,23 @@ describe('wordSetVisibility', () => {
     const publicSet = { owner_user_id: 5, visibility: 'public' };
     const unlistedSet = { owner_user_id: 5, visibility: 'unlisted' };
 
-    it('власник бачить свій private набір', () => {
+    it('owner can see their private set', () => {
       expect(canAccessWordSet(privateSet, 5)).toBe(true);
     });
 
-    it('чужий користувач не бачить private набір', () => {
+    it('another user cannot see a private set', () => {
       expect(canAccessWordSet(privateSet, 99)).toBe(false);
       expect(canAccessWordSet(privateSet, null)).toBe(false);
     });
 
-    it('public і unlisted доступні без авторизації', () => {
+    it('public and unlisted are available without auth', () => {
       expect(canAccessWordSet(publicSet, null)).toBe(true);
       expect(canAccessWordSet(unlistedSet, null)).toBe(true);
     });
   });
 
   describe('isListedOnHome', () => {
-    it('лише public на головній', () => {
+    it('only public on the home page', () => {
       expect(isListedOnHome({ visibility: 'public' })).toBe(true);
       expect(isListedOnHome({ visibility: 'unlisted' })).toBe(false);
       expect(isListedOnHome({ visibility: 'private' })).toBe(false);
@@ -51,7 +51,7 @@ describe('wordSetVisibility', () => {
   });
 
   describe('buildPublicListingCondition', () => {
-    it('будує умову лише для публічних наборів', () => {
+    it('builds a condition only for public sets', () => {
       const condition = buildPublicListingCondition({ Op });
       expect(condition[Op.or]).toEqual([
         { visibility: 'public' },

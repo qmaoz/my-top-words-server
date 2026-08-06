@@ -11,17 +11,17 @@ describe('apiResponse', () => {
     process.env.NODE_ENV = originalEnv;
   });
 
-  it('у production ховає деталі помилки', () => {
+  it('hides error details in production', () => {
     process.env.NODE_ENV = 'production';
     expect(serverErrorMessage(new Error('sequelize timeout'))).toBe('Internal server error');
   });
 
-  it('у development показує message', () => {
+  it('shows message in development', () => {
     process.env.NODE_ENV = 'development';
     expect(serverErrorMessage(new Error('debug info'))).toBe('debug info');
   });
 
-  it('respondServerError повертає 500', () => {
+  it('respondServerError returns 500', () => {
     process.env.NODE_ENV = 'production';
     const json = vi.fn();
     const status = vi.fn(() => ({ json }));
@@ -36,7 +36,7 @@ describe('apiResponse', () => {
     });
   });
 
-  it('respondAuthTokenError повертає уніфіковане 401', () => {
+  it('respondAuthTokenError returns a unified 401', () => {
     const json = vi.fn();
     const status = vi.fn(() => ({ json }));
     const res = { status };

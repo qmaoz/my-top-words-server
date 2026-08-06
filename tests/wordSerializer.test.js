@@ -1,7 +1,7 @@
 const { serializeWord } = require('../utils/wordSerializer');
 
 describe('serializeWord', () => {
-  it('будує мапу translations з масиву перекладів', () => {
+  it('builds a translations map from an array', () => {
     const result = serializeWord({
       id: 1,
       word_text: 'Haus',
@@ -18,7 +18,7 @@ describe('serializeWord', () => {
     expect(result.sentence_translation_uk).toBe('Дім великий.');
   });
 
-  it('падає до legacy-колонок, якщо немає рядка uk', () => {
+  it('falls back to legacy columns when uk row is missing', () => {
     const result = serializeWord({
       id: 2,
       word_text: 'Katze',
@@ -31,12 +31,12 @@ describe('serializeWord', () => {
     expect(result.translations.uk).toEqual({ word_translation: 'кіт', sentence_translation: 'Кіт спить.' });
   });
 
-  it('зберігає isLearned, якщо присутнє', () => {
+  it('keeps isLearned when present', () => {
     const result = serializeWord({ id: 3, word_text: 'a', sentence_text: 'b', translations: [], isLearned: true });
     expect(result.isLearned).toBe(true);
   });
 
-  it('word_translation_uk = null, якщо немає перекладу uk', () => {
+  it('word_translation_uk is null when uk translation is missing', () => {
     const result = serializeWord({
       id: 4,
       word_text: 'a',

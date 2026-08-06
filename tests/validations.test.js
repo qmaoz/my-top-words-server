@@ -25,7 +25,7 @@ describe('validations', () => {
   describe('loginValidation', () => {
     const app = buildValidationApp(loginValidation);
 
-    it('відхиляє порожній пароль', async () => {
+    it('rejects an empty password', async () => {
       const res = await request(app)
         .post('/test')
         .send({ username: 'user', password: '' });
@@ -33,7 +33,7 @@ describe('validations', () => {
       expect(res.status).toBe(400);
     });
 
-    it('приймає валідні дані', async () => {
+    it('accepts valid data', async () => {
       const res = await request(app)
         .post('/test')
         .send({ username: 'user', password: 'SecretPass1!' });
@@ -45,7 +45,7 @@ describe('validations', () => {
   describe('feedbackValidation page_url', () => {
     const app = buildValidationApp(feedbackValidation);
 
-    it('відхиляє зовнішній URL', async () => {
+    it('rejects an external URL', async () => {
       const res = await request(app)
         .post('/test')
         .send({ type: 'bug', message: 'test', page_url: 'https://evil.com' });
@@ -54,7 +54,7 @@ describe('validations', () => {
       expect(res.body.message).toMatch(/internal path/i);
     });
 
-    it('приймає внутрішній шлях', async () => {
+    it('accepts an internal path', async () => {
       const res = await request(app)
         .post('/test')
         .send({ type: 'bug', message: 'test', page_url: '/about' });
@@ -62,7 +62,7 @@ describe('validations', () => {
       expect(res.status).toBe(200);
     });
 
-    it('приймає відсутній page_url', async () => {
+    it('accepts a missing page_url', async () => {
       const res = await request(app)
         .post('/test')
         .send({ type: 'bug', message: 'test' });
@@ -72,11 +72,11 @@ describe('validations', () => {
   });
 
   describe('registerValidation', () => {
-    it('містить правила username, password і confirm_password', () => {
+    it('includes username, password, and confirm_password rules', () => {
       expect(registerValidation).toHaveLength(3);
     });
 
-    it('confirm_password має збігатися з password', async () => {
+    it('confirm_password must match password', async () => {
       const confirmRules = [
         body('password').trim(),
         body('confirm_password')

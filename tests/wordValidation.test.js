@@ -20,7 +20,7 @@ function buildValidationApp(rules) {
 describe('wordValidation (translations)', () => {
   const app = buildValidationApp(wordValidation);
 
-  it('приймає слово з валідними перекладами', async () => {
+  it('accepts a word with valid translations', async () => {
     const res = await request(app).post('/test').send({
       word_text: 'Haus',
       sentence_text: 'Das Haus ist groß.',
@@ -31,7 +31,7 @@ describe('wordValidation (translations)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('відхиляє, якщо немає перекладів', async () => {
+  it('rejects when translations are missing', async () => {
     const res = await request(app).post('/test').send({
       word_text: 'Haus',
       sentence_text: 'Das Haus ist groß.',
@@ -40,7 +40,7 @@ describe('wordValidation (translations)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('відхиляє непідтримувану мову перекладу', async () => {
+  it('rejects an unsupported translation locale', async () => {
     const res = await request(app).post('/test').send({
       word_text: 'Haus',
       sentence_text: 'Das Haus ist groß.',
@@ -49,7 +49,7 @@ describe('wordValidation (translations)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('відхиляє порожнє слово', async () => {
+  it('rejects an empty word', async () => {
     const res = await request(app).post('/test').send({
       word_text: '',
       sentence_text: 'a',
@@ -62,7 +62,7 @@ describe('wordValidation (translations)', () => {
 describe('bulkWordsValidation (translations)', () => {
   const app = buildValidationApp(bulkWordsValidation);
 
-  it('приймає масив із двома мовами перекладу', async () => {
+  it('accepts an array with two translation locales', async () => {
     const res = await request(app).post('/test').send({
       words: [
         {
@@ -78,14 +78,14 @@ describe('bulkWordsValidation (translations)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('відхиляє слово без перекладів у масиві', async () => {
+  it('rejects a word without translations in the array', async () => {
     const res = await request(app).post('/test').send({
       words: [{ word_text: 'Haus', sentence_text: 'a', translations: {} }],
     });
     expect(res.status).toBe(400);
   });
 
-  it('відхиляє порожній масив', async () => {
+  it('rejects an empty array', async () => {
     const res = await request(app).post('/test').send({ words: [] });
     expect(res.status).toBe(400);
   });
